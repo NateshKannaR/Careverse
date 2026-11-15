@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js && cp dist/server.js index.js && cp dist/server.js server.js",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -34,6 +34,7 @@
     "@types/node": "^22.13.9",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
+    "esbuild": "^0.28.2",
     "supertest": "^7.0.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
