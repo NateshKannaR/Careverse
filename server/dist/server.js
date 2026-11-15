@@ -1,3 +1,4 @@
+import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -63968,6 +63969,7 @@ var apiLimiter = lib_default({
   // limit each IP to 300 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     error: "Too many requests from this client. Please slow down and try again later."
   }
@@ -63977,6 +63979,7 @@ var authLimiter = lib_default({
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     error: "Too many authentication attempts. Please try again after 15 minutes."
   }
@@ -65761,7 +65764,10 @@ function v4(options, buf, offset) {
 var v4_default = v4;
 
 // src/db/storageAdapter.ts
-var STORAGE_FILE_PATH = process.env.VERCEL ? path2.resolve("/tmp", ".storage_careverse.json") : path2.resolve(process.cwd(), ".storage_careverse.json");
+var isServerless = Boolean(
+  process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT
+);
+var STORAGE_FILE_PATH = isServerless ? path2.resolve("/tmp", ".storage_careverse.json") : path2.resolve(process.cwd(), ".storage_careverse.json");
 var StorageAdapter = class {
   store = {
     profiles: [],
@@ -70538,6 +70544,7 @@ var system_routes_default = router13;
 
 // src/server.ts
 var app = (0, import_express14.default)();
+app.set("trust proxy", 1);
 app.use(helmet({
   contentSecurityPolicy: false,
   // Allows flexible integration in dev/testing
@@ -70590,7 +70597,10 @@ app.get(["/health", "/api/health"], (req, res) => {
   });
 });
 app.use(errorHandler);
-if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+var isServerless2 = Boolean(
+  process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT
+);
+if (process.env.NODE_ENV !== "test" && !isServerless2) {
   const server = app.listen(config.port, () => {
     console.log(`=======================================================`);
     console.log(` CAREVERSE Healthcare API Server running on port ${config.port}`);

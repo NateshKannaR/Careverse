@@ -6,6 +6,7 @@ export const apiLimiter = rateLimit({
   max: 300, // limit each IP to 300 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     error: 'Too many requests from this client. Please slow down and try again later.'
   }
@@ -17,6 +18,7 @@ export const authLimiter = rateLimit({
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     error: 'Too many authentication attempts. Please try again after 15 minutes.'
   }

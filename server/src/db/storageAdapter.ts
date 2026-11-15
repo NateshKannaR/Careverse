@@ -38,7 +38,14 @@ interface DatabaseStore {
   auditLogs: AuditLog[];
 }
 
-const STORAGE_FILE_PATH = process.env.VERCEL
+const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT
+);
+
+const STORAGE_FILE_PATH = isServerless
   ? path.resolve('/tmp', '.storage_careverse.json')
   : path.resolve(process.cwd(), '.storage_careverse.json');
 
