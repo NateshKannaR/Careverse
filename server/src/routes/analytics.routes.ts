@@ -3,6 +3,7 @@ import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { CareScoreService } from '../services/careScoreService.js';
+import { generateAdherenceInsight } from '../services/adherencePatternService.js';
 
 const router = Router();
 router.use(authenticateJwt);
@@ -33,6 +34,23 @@ router.get('/daily-score', (req: Request, res: Response): void => {
   const dateStr = req.query.date as string;
   const score = CareScoreService.calculateDailyCareScore(patientId, dateStr);
   res.json({ score });
+});
+
+// GET /api/analytics/adherence-patterns - slot-based habitual pattern detection & lifestyle advice
+router.get('/adherence-patterns', (req: Request, res: Response): void => {
+  const patientId = resolvePatientId(req);
+  if (!patientId) {
+    res.status(400).json({ error: 'Patient ID is required.' });
+    return;
+  }
+
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
+
+  const medications = db.getMedications(patientId, true);
+  const records = db.getAdministrationRecords(patientId);
+  const insight = generateAdherenceInsight(medications, records);
+
+  res.json({ insight });
 });
 
 // GET /api/analytics/adherence - 7, 14, or 30 days adherence trends based on real administration records

@@ -16,7 +16,8 @@ import {
   NotificationPreferences,
   NotificationDeliveryLog,
   EmergencyContact,
-  AuditLog
+  AuditLog,
+  PasscodeInvite
 } from '../types/index.js';
 
 interface DatabaseStore {
@@ -24,6 +25,7 @@ interface DatabaseStore {
   patientProfiles: PatientProfile[];
   careCircleMembers: CareCircleMember[];
   invitations: Invitation[];
+  passcodeInvites: PasscodeInvite[];
   medications: Medication[];
   administrationRecords: MedicationAdministrationRecord[];
   appointments: Appointment[];
@@ -44,6 +46,7 @@ class StorageAdapter {
     patientProfiles: [],
     careCircleMembers: [],
     invitations: [],
+    passcodeInvites: [],
     medications: [],
     administrationRecords: [],
     appointments: [],
@@ -168,6 +171,12 @@ class StorageAdapter {
         can_manage_appointments: true,
         can_add_notes: true,
         status: 'active',
+        permissions: {
+          medications: true,
+          appointments: true,
+          wellbeing: true,
+          care_notes: true
+        },
         created_at: new Date().toISOString()
       },
       {
@@ -180,6 +189,35 @@ class StorageAdapter {
         can_manage_appointments: true,
         can_add_notes: true,
         status: 'active',
+        permissions: {
+          medications: true,
+          appointments: true,
+          wellbeing: true,
+          care_notes: true
+        },
+        created_at: new Date().toISOString()
+      }
+    ];
+
+    // Seed Demo Passcode Invite (CARE-2026 for evaluators)
+    this.store.passcodeInvites = [
+      {
+        id: 'pppppppp-pppp-pppp-pppp-ppppppppppp1',
+        patient_id: patientProfile.id,
+        created_by: eleanor.id,
+        passcode_hash: bcrypt.hashSync('CARE-2026', 10),
+        passcode_prefix: 'CA',
+        raw_passcode: 'CARE-2026',
+        role: 'family',
+        relationship: 'Family Caregiver',
+        can_view: true,
+        can_manage_meds: true,
+        can_manage_appointments: true,
+        can_add_notes: true,
+        max_uses: 10,
+        uses_count: 0,
+        is_revoked: false,
+        expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
         created_at: new Date().toISOString()
       }
     ];
@@ -677,6 +715,51 @@ class StorageAdapter {
     };
     this.persist();
     return this.store.invitations[idx];
+  }
+
+  // --- Passcode Invites ---
+  public createPasscodeInvite(invite: PasscodeInvite): PasscodeInvite {
+    if (!this.store.passcodeInvites) this.store.passcodeInvites = [];
+    this.store.passcodeInvites.push(invite);
+    this.persist();
+    return invite;
+  }
+
+  public getPasscodeInvitesForPatient(patientId: string): PasscodeInvite[] {
+    return (this.store.passcodeInvites || []).filter(p => p.patient_id === patientId && !p.is_revoked);
+  }
+
+  public getAllActivePasscodeInvites(): PasscodeInvite[] {
+    return (this.store.passcodeInvites || []).filter(p => !p.is_revoked);
+  }
+
+  public getPasscodeInviteById(id: string): PasscodeInvite | undefined {
+    return (this.store.passcodeInvites || []).find(p => p.id === id);
+  }
+
+  public updatePasscodeInvite(id: string, updates: Partial<PasscodeInvite>): PasscodeInvite | null {
+    if (!this.store.passcodeInvites) this.store.passcodeInvites = [];
+    const idx = this.store.passcodeInvites.findIndex(p => p.id === id);
+    if (idx === -1) return null;
+    this.store.passcodeInvites[idx] = {
+      ...this.store.passcodeInvites[idx],
+      ...updates
+    };
+    this.persist();
+    return this.store.passcodeInvites[idx];
+  }
+
+  public getPendingCareCircleMembers(patientId: string): CareCircleMember[] {
+    return this.store.careCircleMembers
+      .filter(m => m.patient_id === patientId && m.status === 'pending')
+      .map(m => ({
+        ...m,
+        member: this.getProfileById(m.member_user_id)
+      }));
+  }
+
+  public getCareCircleMemberById(id: string): CareCircleMember | undefined {
+    return this.store.careCircleMembers.find(m => m.id === id);
   }
 
   // --- Medications ---

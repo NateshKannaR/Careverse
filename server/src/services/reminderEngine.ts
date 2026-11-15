@@ -353,4 +353,192 @@ export class ReminderEngine {
       }
     }
   }
+
+  /**
+   * Evaluator Testing Playground: Trigger on-demand simulated reminders
+   */
+  public static async triggerSimulatedReminder(
+    type: 'upcoming_dose_15m' | 'missed_dose_15m' | 'missed_dose_60m' | 'appointment_24h' | 'appointment_2h' | 'refill_alert',
+    patientId: string
+  ): Promise<{ success: boolean; message: string; dispatchedCount: number }> {
+    const patient = db.getPatientProfileById(patientId) || db.getAllPatientProfiles()[0];
+    if (!patient) {
+      throw new Error('Patient profile not found');
+    }
+
+    const patientUser = db.getProfileById(patient.user_id);
+    const careCircle = db.getCareCircleMembers(patient.id);
+    const medications = db.getMedications(patient.id, true);
+    const appointments = db.getAppointments(patient.id);
+
+    const med = medications[0] || { name: 'Lisinopril', dosage: '10mg' };
+    const appt = appointments[0] || {
+      doctor_name: 'Dr. Sarah Connor',
+      hospital_clinic: 'Metro Health Cardiology',
+      appointment_date: 'Tomorrow',
+      appointment_time: '10:30 AM'
+    };
+
+    let dispatchedCount = 0;
+    const testHashSuffix = `${Date.now()}`;
+
+    if (type === 'upcoming_dose_15m') {
+      if (patientUser) {
+        await EmailService.sendEmail({
+          recipientEmail: patientUser.email,
+          recipientId: patientUser.id,
+          patientId: patient.id,
+          type: 'medication_reminder',
+          subject: `Upcoming Medication: ${med.name} (${med.dosage}) scheduled in 15 minutes`,
+          textContent: `Hello ${patientUser.full_name}, your dose of ${med.name} is scheduled in 15 minutes.`,
+          htmlContent: EmailService.buildEmailHtml(
+            `Upcoming Medication Due in 15 Minutes`,
+            `<p>Hello <strong>${patientUser.full_name}</strong>,</p>
+             <p>This is a proactive reminder that your scheduled dose of <strong>${med.name} (${med.dosage})</strong> is due in 15 minutes.</p>
+             <p><em>Instructions:</em> Take with a full glass of water. Confirm in Careverse when taken.</p>`
+          ),
+          dedupHash: `sim-upcoming-${med.id}-${testHashSuffix}`
+        });
+        dispatchedCount++;
+      }
+      return { success: true, message: `Dispatched upcoming dose (-15m) reminder for ${med.name}`, dispatchedCount };
+    }
+
+    if (type === 'missed_dose_15m') {
+      // Stage 1 Missed Dose: Sent to elder and primary caregiver
+      if (patientUser) {
+        await EmailService.sendEmail({
+          recipientEmail: patientUser.email,
+          recipientId: patientUser.id,
+          patientId: patient.id,
+          type: 'missed_dose',
+          subject: `Stage 1 Alert: Have you taken your ${med.name}?`,
+          textContent: `Hello ${patientUser.full_name}, your dose of ${med.name} was scheduled 15 minutes ago. Please take it or mark it as taken.`,
+          htmlContent: EmailService.buildEmailHtml(
+            `Stage 1 Overdue Dose Notice (+15m)`,
+            `<p>Hello <strong>${patientUser.full_name}</strong>,</p>
+             <p>Your dose of <strong>${med.name}</strong> was due 15 minutes ago and has not yet been logged in Careverse.</p>
+             <p>If you have already taken it, please tap <strong>"Mark Taken"</strong> on your dashboard.</p>`
+          ),
+          dedupHash: `sim-stage1-patient-${med.id}-${testHashSuffix}`
+        });
+        dispatchedCount++;
+      }
+
+      for (const member of careCircle.slice(0, 1)) {
+        if (member.member) {
+          await EmailService.sendEmail({
+            recipientEmail: member.member.email,
+            recipientId: member.member.id,
+            patientId: patient.id,
+            type: 'missed_dose',
+            subject: `Care Alert: ${patientUser?.full_name}'s ${med.name} is 15 minutes overdue`,
+            textContent: `${patientUser?.full_name} has not logged their ${med.name} dose due 15 minutes ago.`,
+            htmlContent: EmailService.buildEmailHtml(
+              `Caregiver Overdue Alert (+15m)`,
+              `<p>Dear <strong>${member.member.full_name}</strong>,</p>
+               <p><strong>${patientUser?.full_name}</strong> has not logged their scheduled dose of <strong>${med.name}</strong> after the 15-minute grace window.</p>`
+            ),
+            dedupHash: `sim-stage1-caregiver-${member.member.id}-${testHashSuffix}`
+          });
+          dispatchedCount++;
+        }
+      }
+      return { success: true, message: `Dispatched Stage 1 (+15m) overdue alert to patient and caregiver`, dispatchedCount };
+    }
+
+    if (type === 'missed_dose_60m') {
+      // Stage 2 URGENT Escalation: Dispatched to all family circle editors and caregivers
+      for (const member of careCircle) {
+        if (member.member) {
+          await EmailService.sendEmail({
+            recipientEmail: member.member.email,
+            recipientId: member.member.id,
+            patientId: patient.id,
+            type: 'missed_dose',
+            subject: `URGENT CARE ESCALATION: ${patientUser?.full_name} has not taken ${med.name} after 1 hour!`,
+            textContent: `URGENT: ${patientUser?.full_name} has not taken their medication ${med.name} after 60 minutes. Please check on their wellbeing.`,
+            htmlContent: EmailService.buildEmailHtml(
+              `URGENT FAMILY ESCALATION (+60m Overdue)`,
+              `<p style="color: #dc2626; font-weight: bold; font-size: 16px;">⚠️ URGENT MEDICATION ESCALATION</p>
+               <p>Dear <strong>${member.member.full_name}</strong>,</p>
+               <p><strong>${patientUser?.full_name}</strong> has not taken their scheduled medication <strong>${med.name}</strong> after <strong>60 minutes</strong>.</p>
+               <p>Please contact them immediately or verify their safety in the Careverse Family Portal.</p>`
+            ),
+            dedupHash: `sim-stage2-urgent-${member.member.id}-${testHashSuffix}`
+          });
+          dispatchedCount++;
+        }
+      }
+      return { success: true, message: `Dispatched Stage 2 (+60m) urgent escalation to full Care Circle (${dispatchedCount} members)`, dispatchedCount };
+    }
+
+    if (type === 'appointment_24h') {
+      if (patientUser) {
+        await EmailService.sendEmail({
+          recipientEmail: patientUser.email,
+          recipientId: patientUser.id,
+          patientId: patient.id,
+          type: 'appointment_reminder',
+          subject: `Reminder: Doctor Appointment Tomorrow with ${appt.doctor_name}`,
+          textContent: `You have an appointment tomorrow with ${appt.doctor_name} at ${appt.hospital_clinic}.`,
+          htmlContent: EmailService.buildEmailHtml(
+            `Doctor Visit Tomorrow (24h Reminder)`,
+            `<p>Hello <strong>${patientUser.full_name}</strong>,</p>
+             <p>This is your 24-hour reminder for your upcoming consultation with <strong>${appt.doctor_name}</strong>.</p>
+             <p><strong>Location:</strong> ${appt.hospital_clinic}<br/><strong>Time:</strong> ${appt.appointment_time}</p>`
+          ),
+          dedupHash: `sim-appt24h-${appt.id}-${testHashSuffix}`
+        });
+        dispatchedCount++;
+      }
+      return { success: true, message: `Dispatched 24-hour appointment reminder for ${appt.doctor_name}`, dispatchedCount };
+    }
+
+    if (type === 'appointment_2h') {
+      if (patientUser) {
+        await EmailService.sendEmail({
+          recipientEmail: patientUser.email,
+          recipientId: patientUser.id,
+          patientId: patient.id,
+          type: 'appointment_reminder',
+          subject: `Urgent: Doctor Appointment in 2 Hours with ${appt.doctor_name}`,
+          textContent: `Your appointment with ${appt.doctor_name} is in 2 hours.`,
+          htmlContent: EmailService.buildEmailHtml(
+            `Doctor Visit in 2 Hours`,
+            `<p>Hello <strong>${patientUser.full_name}</strong>,</p>
+             <p>Your appointment with <strong>${appt.doctor_name}</strong> begins in <strong>2 hours</strong> at ${appt.hospital_clinic}.</p>`
+          ),
+          dedupHash: `sim-appt2h-${appt.id}-${testHashSuffix}`
+        });
+        dispatchedCount++;
+      }
+      return { success: true, message: `Dispatched 2-hour appointment alert for ${appt.doctor_name}`, dispatchedCount };
+    }
+
+    if (type === 'refill_alert') {
+      if (patientUser) {
+        await EmailService.sendEmail({
+          recipientEmail: patientUser.email,
+          recipientId: patientUser.id,
+          patientId: patient.id,
+          type: 'refill_alert',
+          subject: `Low Supply Warning: ${med.name} has only 3 doses remaining`,
+          textContent: `Your prescription for ${med.name} is running low. Please reorder.`,
+          htmlContent: EmailService.buildEmailHtml(
+            `Prescription Refill Warning`,
+            `<p>Hello <strong>${patientUser.full_name}</strong>,</p>
+             <p>Your medication <strong>${med.name}</strong> is projected to run out in <strong>3 days</strong>.</p>
+             <p>A prescription refill has been flagged for your pharmacy or care circle.</p>`
+          ),
+          dedupHash: `sim-refill-${med.id}-${testHashSuffix}`
+        });
+        dispatchedCount++;
+      }
+      return { success: true, message: `Dispatched low supply refill warning for ${med.name}`, dispatchedCount };
+    }
+
+    return { success: false, message: 'Unknown reminder type', dispatchedCount: 0 };
+  }
 }
+

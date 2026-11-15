@@ -5,6 +5,7 @@ import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { authorizePatientAccess, verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { Medication, MedicationAdministrationRecord, DoseStatus } from '../types/index.js';
+import { predictAllRefills } from '../services/refillService.js';
 
 const router = Router();
 router.use(authenticateJwt);
@@ -126,6 +127,26 @@ router.post('/', (req: Request, res: Response): void => {
   });
 
   res.status(201).json({ medication: created });
+});
+
+// GET /api/medications/refills/forecast - days-to-depletion refill forecasting
+router.get('/refills/forecast', (req: Request, res: Response): void => {
+  const patientId = resolvePatientId(req);
+  if (!patientId) {
+    res.status(400).json({ error: 'Patient ID is required.' });
+    return;
+  }
+
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
+
+  const medications = db.getMedications(patientId, true);
+  const forecast = predictAllRefills(medications);
+
+  res.json({
+    forecast,
+    urgent_count: forecast.filter(f => f.needs_urgent_refill).length,
+    low_stock_count: forecast.filter(f => f.is_low_stock).length
+  });
 });
 
 // GET /api/medications/doses/today - timeline of today's doses with statuses

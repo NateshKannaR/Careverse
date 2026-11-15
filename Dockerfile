@@ -34,8 +34,9 @@ ENV NODE_ENV=production
 ENV PORT=8080
 
 # Copy root and workspace package files
-COPY package.json ./
+COPY package.json package-lock.json* ./
 COPY server/package.json ./server/
+COPY client/package.json ./client/
 
 # Install only production dependencies
 RUN npm ci --omit=dev --workspace=server

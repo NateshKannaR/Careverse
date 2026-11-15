@@ -28,6 +28,13 @@ export interface PatientProfile {
   updated_at?: string;
 }
 
+export interface ElderPrivacyPermissions {
+  medications: boolean;
+  appointments: boolean;
+  wellbeing: boolean;
+  care_notes: boolean;
+}
+
 export interface CareCircleMember {
   id: string;
   patient_id: string;
@@ -38,10 +45,63 @@ export interface CareCircleMember {
   can_manage_appointments: boolean;
   can_add_notes: boolean;
   status: 'active' | 'revoked' | 'pending';
+  permissions?: ElderPrivacyPermissions;
   created_at?: string;
   updated_at?: string;
   // Hydrated fields
   member?: UserProfile;
+}
+
+export interface PasscodeInvite {
+  id: string;
+  patient_id: string;
+  created_by: string;
+  passcode_hash: string;
+  passcode_prefix: string; // first 2 chars for indexed lookup
+  raw_passcode?: string; // only returned upon creation
+  role: 'family' | 'caregiver';
+  relationship: string;
+  can_view: boolean;
+  can_manage_meds: boolean;
+  can_manage_appointments: boolean;
+  can_add_notes: boolean;
+  max_uses: number;
+  uses_count: number;
+  is_revoked: boolean;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface RefillForecast {
+  medication_id: string;
+  medication_name: string;
+  current_supply: number;
+  daily_consumption: number;
+  days_remaining: number;
+  predicted_runout_date: string;
+  is_low_stock: boolean;
+  needs_urgent_refill: boolean;
+}
+
+export interface AdherencePattern {
+  slot_name: 'morning' | 'afternoon' | 'evening' | 'bedtime';
+  time_window: string;
+  total_scheduled: number;
+  missed_count: number;
+  missed_percentage: number;
+  suggestion: string;
+}
+
+export interface AdherenceInsight {
+  has_data: boolean;
+  weekly_adherence_rate: number | null;
+  monthly_adherence_rate: number | null;
+  streak_days: number;
+  total_scheduled_week: number;
+  total_taken_week: number;
+  total_missed_week: number;
+  patterns: AdherencePattern[];
+  disclaimer: string;
 }
 
 export interface Invitation {
