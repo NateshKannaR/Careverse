@@ -8,6 +8,8 @@
     "server": {
       "root": "server",
       "framework": "express",
+      "entrypoint": "server.js",
+      "buildCommand": "npm run build",
       "bindings": [
         {
           "type": "service",
@@ -19,6 +21,12 @@
     }
   },
   "rewrites": [
+    {
+      "source": "/api",
+      "destination": {
+        "service": "server"
+      }
+    },
     {
       "source": "/api/(.*)",
       "destination": {
