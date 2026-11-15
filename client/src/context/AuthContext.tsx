@@ -48,58 +48,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token]);
 
+  const safeParseResponse = async (res: Response) => {
+    try {
+      return await res.json();
+    } catch {
+      const text = await res.text().catch(() => '');
+      return { error: text || `Server error (${res.status})` };
+    }
+  };
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await safeParseResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to login');
+      }
+      localStorage.setItem('careverse_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } finally {
       setIsLoading(false);
-      throw new Error(data.error || 'Failed to login');
     }
-    localStorage.setItem('careverse_token', data.token);
-    setToken(data.token);
-    setUser(data.user);
-    setIsLoading(false);
   };
 
   const demoLogin = async (role: UserRole) => {
     setIsLoading(true);
-    const res = await fetch('/api/auth/demo-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role })
-    });
-    const data = await res.json();
-    if (!res.ok) {
+    try {
+      const res = await fetch('/api/auth/demo-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role })
+      });
+      const data = await safeParseResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to login with demo role');
+      }
+      localStorage.setItem('careverse_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } finally {
       setIsLoading(false);
-      throw new Error(data.error || 'Failed to login with demo role');
     }
-    localStorage.setItem('careverse_token', data.token);
-    setToken(data.token);
-    setUser(data.user);
-    setIsLoading(false);
   };
 
   const register = async (formData: any) => {
     setIsLoading(true);
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
-    const data = await res.json();
-    if (!res.ok) {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const data = await safeParseResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+      localStorage.setItem('careverse_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } finally {
       setIsLoading(false);
-      throw new Error(data.error || 'Registration failed');
     }
-    localStorage.setItem('careverse_token', data.token);
-    setToken(data.token);
-    setUser(data.user);
-    setIsLoading(false);
   };
 
   const logout = () => {

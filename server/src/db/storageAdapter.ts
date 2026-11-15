@@ -38,7 +38,9 @@ interface DatabaseStore {
   auditLogs: AuditLog[];
 }
 
-const STORAGE_FILE_PATH = path.resolve(process.cwd(), '.storage_careverse.json');
+const STORAGE_FILE_PATH = process.env.VERCEL
+  ? path.resolve('/tmp', '.storage_careverse.json')
+  : path.resolve(process.cwd(), '.storage_careverse.json');
 
 class StorageAdapter {
   private store: DatabaseStore = {
@@ -68,9 +70,20 @@ class StorageAdapter {
       if (fs.existsSync(STORAGE_FILE_PATH)) {
         const raw = fs.readFileSync(STORAGE_FILE_PATH, 'utf-8');
         this.store = JSON.parse(raw);
-        console.log('[StorageAdapter] Loaded persistent state from file.');
+        console.log('[StorageAdapter] Loaded persistent state from file:', STORAGE_FILE_PATH);
       } else {
-        this.seedInitialData();
+        const bundledPath = path.resolve(process.cwd(), '.storage_careverse.json');
+        if (bundledPath !== STORAGE_FILE_PATH && fs.existsSync(bundledPath)) {
+          try {
+            const raw = fs.readFileSync(bundledPath, 'utf-8');
+            this.store = JSON.parse(raw);
+            console.log('[StorageAdapter] Loaded state from bundled seed file.');
+          } catch {
+            this.seedInitialData();
+          }
+        } else {
+          this.seedInitialData();
+        }
         this.persist();
         console.log('[StorageAdapter] Initialized with realistic demo healthcare seed data.');
       }

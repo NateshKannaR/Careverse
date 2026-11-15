@@ -8,12 +8,18 @@ const getAuthHeaders = (): Record<string, string> => {
 
 const handleResponse = async <T = any>(res: Response): Promise<T> => {
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
+    let errorData: any = {};
+    try {
+      errorData = await res.json();
+    } catch {
+      const text = await res.text().catch(() => '');
+      errorData = { error: text || `HTTP error ${res.status}` };
+    }
     const error: any = new Error(errorData.error || `HTTP request failed with status ${res.status}`);
     error.response = { status: res.status, data: errorData };
     throw error;
   }
-  return res.json();
+  return res.json().catch(() => ({}));
 };
 
 const normalizeUrl = (url: string): string => {

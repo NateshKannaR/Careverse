@@ -44,28 +44,53 @@ if (config.nodeEnv !== 'test') {
 }
 
 // Global rate limiting
-app.use('/api', apiLimiter);
+app.use(['/api', '/auth', '/patients', '/medications', '/appointments', '/care-circle', '/wellbeing', '/care-notes', '/notifications', '/carebuddy', '/analytics', '/emergency', '/audit', '/system'], apiLimiter);
 
-// API Route Mounts
-app.use('/api/auth', authRoutes);
-app.use('/api/patients', patientRoutes);
-app.use('/api/medications', medicationRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/care-circle', careCircleRoutes);
-app.use('/api/wellbeing', wellbeingRoutes);
-app.use('/api/care-notes', careNotesRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/carebuddy', careBuddyRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/emergency', emergencyRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api/system', systemRoutes);
+// API Route Mounts (Support both /api/* and /* for transparent Vercel service routing)
+const routeList: [string, any][] = [
+  ['/auth', authRoutes],
+  ['/patients', patientRoutes],
+  ['/medications', medicationRoutes],
+  ['/appointments', appointmentRoutes],
+  ['/care-circle', careCircleRoutes],
+  ['/wellbeing', wellbeingRoutes],
+  ['/care-notes', careNotesRoutes],
+  ['/notifications', notificationRoutes],
+  ['/carebuddy', careBuddyRoutes],
+  ['/analytics', analyticsRoutes],
+  ['/emergency', emergencyRoutes],
+  ['/audit', auditRoutes],
+  ['/system', systemRoutes]
+];
+
+for (const [routePath, routeHandler] of routeList) {
+  app.use(`/api${routePath}`, routeHandler);
+  app.use(routePath, routeHandler);
+}
+
+// Health check and diagnostic routes
+app.get(['/', '/api'], (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'CAREVERSE Healthcare API Server',
+    environment: config.nodeEnv,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get(['/health', '/api/health'], (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
 
 // Central error handler
 app.use(errorHandler);
 
-// Only listen and start reminder cron if run directly (not during unit tests)
-if (process.env.NODE_ENV !== 'test') {
+// Only listen and start reminder cron if run directly (not during unit tests and not in Vercel Serverless)
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   const server = app.listen(config.port, () => {
     console.log(`=======================================================`);
     console.log(` CAREVERSE Healthcare API Server running on port ${config.port}`);
@@ -90,3 +115,5 @@ if (process.env.NODE_ENV !== 'test') {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }
+
+export default app;
