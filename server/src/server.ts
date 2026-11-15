@@ -92,16 +92,19 @@ app.get(['/health', '/api/health'], (req, res) => {
 // Central error handler
 app.use(errorHandler);
 
-// Comprehensive serverless environment detection (Vercel, AWS Lambda)
-const isServerless = Boolean(
-  process.env.VERCEL ||
-  process.env.VERCEL_ENV ||
-  process.env.AWS_LAMBDA_FUNCTION_NAME ||
-  process.env.LAMBDA_TASK_ROOT
+// Only listen and start background cron when invoked directly from CLI (e.g. node server/dist/server.js or tsx src/server.ts)
+// NEVER listen when imported as a serverless function handler or during automated testing.
+const isDirectCliExecution = Boolean(
+  process.argv[1] &&
+  (process.argv[1].endsWith('server.ts') || process.argv[1].endsWith('server.js')) &&
+  !process.env.VERCEL &&
+  !process.env.VERCEL_ENV &&
+  !process.env.AWS_LAMBDA_FUNCTION_NAME &&
+  !process.env.LAMBDA_TASK_ROOT &&
+  process.env.NODE_ENV !== 'test'
 );
 
-// Only listen and start reminder cron if run directly as long-running server (not in tests or serverless lambdas)
-if (process.env.NODE_ENV !== 'test' && !isServerless) {
+if (isDirectCliExecution) {
   const server = app.listen(config.port, () => {
     console.log(`=======================================================`);
     console.log(` CAREVERSE Healthcare API Server running on port ${config.port}`);

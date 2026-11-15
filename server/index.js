@@ -70597,10 +70597,10 @@ app.get(["/health", "/api/health"], (req, res) => {
   });
 });
 app.use(errorHandler);
-var isServerless2 = Boolean(
-  process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT
+var isDirectCliExecution = Boolean(
+  process.argv[1] && (process.argv[1].endsWith("server.ts") || process.argv[1].endsWith("server.js")) && !process.env.VERCEL && !process.env.VERCEL_ENV && !process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.LAMBDA_TASK_ROOT && process.env.NODE_ENV !== "test"
 );
-if (process.env.NODE_ENV !== "test" && !isServerless2) {
+if (isDirectCliExecution) {
   const server = app.listen(config.port, () => {
     console.log(`=======================================================`);
     console.log(` CAREVERSE Healthcare API Server running on port ${config.port}`);
