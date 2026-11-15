@@ -14,6 +14,7 @@ import {
   CareNote,
   NotificationRecord,
   NotificationPreferences,
+  NotificationDeliveryLog,
   EmergencyContact,
   AuditLog
 } from '../types/index.js';
@@ -30,6 +31,7 @@ interface DatabaseStore {
   careNotes: CareNote[];
   notifications: NotificationRecord[];
   notificationPreferences: NotificationPreferences[];
+  deliveryLogs: NotificationDeliveryLog[];
   emergencyContacts: EmergencyContact[];
   auditLogs: AuditLog[];
 }
@@ -49,6 +51,7 @@ class StorageAdapter {
     careNotes: [],
     notifications: [],
     notificationPreferences: [],
+    deliveryLogs: [],
     emergencyContacts: [],
     auditLogs: []
   };
@@ -883,6 +886,22 @@ class StorageAdapter {
     }
     this.persist();
     return pref;
+  }
+
+  // --- Delivery Logs ---
+  public createDeliveryLog(log: NotificationDeliveryLog): NotificationDeliveryLog {
+    if (!this.store.deliveryLogs) this.store.deliveryLogs = [];
+    this.store.deliveryLogs.push(log);
+    this.persist();
+    return log;
+  }
+
+  public getDeliveryLogs(notificationId?: string): NotificationDeliveryLog[] {
+    if (!this.store.deliveryLogs) this.store.deliveryLogs = [];
+    if (notificationId) {
+      return this.store.deliveryLogs.filter(l => l.notification_id === notificationId);
+    }
+    return [...this.store.deliveryLogs];
   }
 
   // --- Emergency Contacts ---

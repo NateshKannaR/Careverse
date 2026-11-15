@@ -8,8 +8,10 @@ const router = Router();
 router.use(authenticateJwt);
 
 const resolvePatientId = (req: Request): string => {
-  if (req.query.patientId) return req.query.patientId as string;
-  if (req.body.patient_id) return req.body.patient_id;
+  const qPatient = (req.query.patientId || req.query.patient_id) as string;
+  if (qPatient) return qPatient;
+  if (req.body?.patient_id) return req.body.patient_id;
+  if (req.body?.patientId) return req.body.patientId;
   if (req.user?.role === 'elderly' && req.user.patient_id) return req.user.patient_id;
   if (req.user) {
     const memberships = db.getCareCircleMembershipsForUser(req.user.id);

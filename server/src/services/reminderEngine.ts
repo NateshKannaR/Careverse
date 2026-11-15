@@ -54,6 +54,26 @@ export class ReminderEngine {
       const patientUser = db.getProfileById(patient.user_id);
       const careCircle = db.getCareCircleMembers(patient.id);
 
+      // Support patient timezone for accurate local time evaluation
+      const userTz = patientUser?.timezone || 'UTC';
+      let tzHour = now.getHours();
+      let tzMinute = now.getMinutes();
+      try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: userTz,
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false
+        }).formatToParts(now);
+        const hPart = parts.find(p => p.type === 'hour')?.value;
+        const mPart = parts.find(p => p.type === 'minute')?.value;
+        if (hPart !== undefined) tzHour = parseInt(hPart, 10) % 24;
+        if (mPart !== undefined) tzMinute = parseInt(mPart, 10);
+      } catch {
+        // Fallback to local time if timezone string is unparseable
+      }
+      const currentMinutesInDay = tzHour * 60 + tzMinute;
+
       for (const med of medications) {
         for (const timeStr of med.times_of_day) {
           const [hours, minutes] = timeStr.split(':').map(Number);
@@ -87,7 +107,10 @@ export class ReminderEngine {
 
           if (!record) continue;
 
-          const diffMinutes = (now.getTime() - scheduledTime.getTime()) / (60 * 1000);
+          // Timezone-adjusted minutes difference
+          const scheduledMinutesInDay = hours * 60 + minutes;
+          const diffMinutes = currentMinutesInDay - scheduledMinutesInDay;
+
 
           // 1. Upcoming reminder (15 minutes before)
           if (diffMinutes >= -15 && diffMinutes < 0 && record.status === 'upcoming') {

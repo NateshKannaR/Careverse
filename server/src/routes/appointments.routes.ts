@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
+import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { Appointment } from '../types/index.js';
 
 const router = Router();
@@ -28,8 +29,10 @@ const appointmentSchema = z.object({
 });
 
 const resolvePatientId = (req: Request): string => {
-  if (req.query.patientId) return req.query.patientId as string;
-  if (req.body.patient_id) return req.body.patient_id;
+  const qPatient = (req.query.patientId || req.query.patient_id) as string;
+  if (qPatient) return qPatient;
+  if (req.body?.patient_id) return req.body.patient_id;
+  if (req.body?.patientId) return req.body.patientId;
   if (req.user?.role === 'elderly' && req.user.patient_id) return req.user.patient_id;
   if (req.user) {
     const memberships = db.getCareCircleMembershipsForUser(req.user.id);
@@ -45,6 +48,8 @@ router.get('/', (req: Request, res: Response): void => {
     res.status(400).json({ error: 'Patient ID is required.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
 
   let appointments = db.getAppointments(patientId);
   const statusFilter = req.query.status as string;
@@ -72,20 +77,7 @@ router.post('/', (req: Request, res: Response): void => {
     return;
   }
 
-  // Permission check
-  if (req.user?.role !== 'admin') {
-    if (req.user?.role === 'elderly' && req.user.patient_id !== patientId) {
-      res.status(403).json({ error: 'Access denied.' });
-      return;
-    }
-    if (req.user?.role === 'family' || req.user?.role === 'caregiver') {
-      const member = db.getCareCircleMember(patientId, req.user.id);
-      if (!member || !member.can_manage_appointments) {
-        res.status(403).json({ error: 'Access denied. You do not have permission to schedule appointments for this patient.' });
-        return;
-      }
-    }
-  }
+  if (!verifyPatientAccess(req, res, patientId, 'manage_appointments')) return;
 
   const newAppointment: Appointment = {
     ...parsed.data,
@@ -115,6 +107,9 @@ router.get('/:id', (req: Request, res: Response): void => {
     res.status(404).json({ error: 'Appointment not found.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, appt.patient_id, 'view')) return;
+
   res.json({ appointment: appt });
 });
 
@@ -125,6 +120,8 @@ router.put('/:id', (req: Request, res: Response): void => {
     res.status(404).json({ error: 'Appointment not found.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, appt.patient_id, 'manage_appointments')) return;
 
   const updated = db.updateAppointment(appt.id, req.body);
 
@@ -146,6 +143,8 @@ router.patch('/:id/checklist', (req: Request, res: Response): void => {
     res.status(404).json({ error: 'Appointment not found.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, appt.patient_id, 'view')) return;
 
   const { taskIndex, completed } = req.body;
   if (typeof taskIndex !== 'number' || typeof completed !== 'boolean') {
@@ -172,6 +171,8 @@ router.delete('/:id', (req: Request, res: Response): void => {
     return;
   }
 
+  if (!verifyPatientAccess(req, res, appt.patient_id, 'manage_appointments')) return;
+
   db.updateAppointment(appt.id, { status: 'cancelled' });
 
   db.logAudit({
@@ -184,5 +185,6 @@ router.delete('/:id', (req: Request, res: Response): void => {
 
   res.json({ message: 'Appointment marked as cancelled.' });
 });
+
 
 export default router;

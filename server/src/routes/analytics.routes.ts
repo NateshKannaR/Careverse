@@ -1,14 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
+import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { CareScoreService } from '../services/careScoreService.js';
 
 const router = Router();
 router.use(authenticateJwt);
 
 const resolvePatientId = (req: Request): string => {
-  if (req.query.patientId) return req.query.patientId as string;
-  if (req.body.patient_id) return req.body.patient_id;
+  const qPatient = (req.query.patientId || req.query.patient_id) as string;
+  if (qPatient) return qPatient;
+  if (req.body?.patient_id) return req.body.patient_id;
+  if (req.body?.patientId) return req.body.patientId;
   if (req.user?.role === 'elderly' && req.user.patient_id) return req.user.patient_id;
   if (req.user) {
     const memberships = db.getCareCircleMembershipsForUser(req.user.id);
@@ -25,6 +28,8 @@ router.get('/daily-score', (req: Request, res: Response): void => {
     return;
   }
 
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
+
   const dateStr = req.query.date as string;
   const score = CareScoreService.calculateDailyCareScore(patientId, dateStr);
   res.json({ score });
@@ -37,6 +42,8 @@ router.get('/adherence', (req: Request, res: Response): void => {
     res.status(400).json({ error: 'Patient ID is required.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
 
   const days = parseInt((req.query.days as string) || '7', 10);
   const now = new Date();
@@ -65,7 +72,16 @@ router.get('/adherence', (req: Request, res: Response): void => {
     const skipped = records.filter(r => r.status === 'skipped').length;
     const scheduled = records.length;
 
-    const rate = scheduled > 0 ? Math.round((taken / scheduled) * 100) : 100;
+    // For today, calculate adherence only on doses that have become due so far
+    const isToday = i === 0;
+    let rate = 100;
+    if (isToday) {
+      const dueSoFar = taken + missed + skipped;
+      rate = dueSoFar > 0 ? Math.round((taken / dueSoFar) * 100) : 100;
+    } else {
+      const pastDue = taken + missed + skipped;
+      rate = pastDue > 0 ? Math.round((taken / pastDue) * 100) : (scheduled > 0 ? 0 : 100);
+    }
 
     dayStats.push({
       date: dateStr,
@@ -82,7 +98,8 @@ router.get('/adherence', (req: Request, res: Response): void => {
   const totalScheduled = dayStats.reduce((acc, curr) => acc + curr.scheduled, 0);
   const totalTaken = dayStats.reduce((acc, curr) => acc + curr.taken, 0);
   const totalMissed = dayStats.reduce((acc, curr) => acc + curr.missed, 0);
-  const averageAdherence = totalScheduled > 0 ? Math.round((totalTaken / totalScheduled) * 100) : 100;
+  const totalDue = totalTaken + totalMissed;
+  const averageAdherence = totalDue > 0 ? Math.round((totalTaken / totalDue) * 100) : 100;
 
   // Breakdown by category
   const medications = db.getMedications(patientId);
@@ -129,6 +146,9 @@ router.get('/export-csv', (req: Request, res: Response): void => {
     res.status(400).json({ error: 'Patient ID is required.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
+
 
   const patient = db.getPatientProfileById(patientId);
   const user = patient ? db.getProfileById(patient.user_id) : undefined;

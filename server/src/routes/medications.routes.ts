@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
-import { authorizePatientAccess } from '../middleware/rbacMiddleware.js';
+import { authorizePatientAccess, verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { Medication, MedicationAdministrationRecord, DoseStatus } from '../types/index.js';
 
 const router = Router();
@@ -29,8 +29,10 @@ const medicationSchema = z.object({
 
 // Helper to determine target patient ID
 const resolvePatientId = (req: Request): string => {
-  if (req.query.patientId) return req.query.patientId as string;
-  if (req.body.patient_id) return req.body.patient_id;
+  const qPatient = (req.query.patientId || req.query.patient_id) as string;
+  if (qPatient) return qPatient;
+  if (req.body?.patient_id) return req.body.patient_id;
+  if (req.body?.patientId) return req.body.patientId;
   if (req.params.patientId) return req.params.patientId;
   if (req.user?.role === 'elderly' && req.user.patient_id) return req.user.patient_id;
   // Fallback to first accessible patient if caregiver or family
@@ -134,6 +136,8 @@ router.get('/doses/today', (req: Request, res: Response): void => {
     return;
   }
 
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
+
   const todayStr = new Date().toISOString().split('T')[0];
   const startIso = `${todayStr}T00:00:00.000Z`;
   const endIso = `${todayStr}T23:59:59.999Z`;
@@ -236,6 +240,9 @@ router.get('/:id', (req: Request, res: Response): void => {
     res.status(404).json({ error: 'Medication not found.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, med.patient_id, 'view')) return;
+
   res.json({ medication: med });
 });
 
@@ -246,6 +253,8 @@ router.put('/:id', (req: Request, res: Response): void => {
     res.status(404).json({ error: 'Medication not found.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, med.patient_id, 'manage_meds')) return;
 
   const updated = db.updateMedication(med.id, req.body);
 
@@ -268,6 +277,8 @@ router.patch('/:id/pause', (req: Request, res: Response): void => {
     res.status(404).json({ error: 'Medication not found.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, med.patient_id, 'manage_meds')) return;
 
   const newStatus = !med.is_active;
   const updated = db.updateMedication(med.id, { is_active: newStatus });
@@ -294,6 +305,8 @@ router.delete('/:id', (req: Request, res: Response): void => {
     return;
   }
 
+  if (!verifyPatientAccess(req, res, med.patient_id, 'manage_meds')) return;
+
   db.deleteMedication(med.id);
 
   db.logAudit({
@@ -307,5 +320,6 @@ router.delete('/:id', (req: Request, res: Response): void => {
 
   res.json({ message: 'Medication successfully deleted.' });
 });
+
 
 export default router;

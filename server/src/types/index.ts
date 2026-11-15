@@ -182,6 +182,18 @@ export interface NotificationPreferences {
   updated_at?: string;
 }
 
+export interface NotificationDeliveryLog {
+  id: string;
+  notification_id: string;
+  provider: 'resend' | 'simulator';
+  status: 'delivered' | 'failed' | 'simulated';
+  attempt_count: number;
+  error_message?: string;
+  response_payload?: Record<string, any>;
+  created_at: string;
+}
+
+
 export interface EmergencyContact {
   id: string;
   patient_id: string;

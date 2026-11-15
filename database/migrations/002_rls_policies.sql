@@ -178,3 +178,69 @@ CREATE POLICY "Patients view own audit logs"
     patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid())
     OR actor_id = auth.uid()
   );
+
+-- 11. Emergency Contacts Policies
+CREATE POLICY "View emergency contacts"
+  ON emergency_contacts FOR SELECT
+  USING (
+    patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid())
+    OR is_care_circle_member(patient_id, auth.uid())
+  );
+
+CREATE POLICY "Manage emergency contacts"
+  ON emergency_contacts FOR ALL
+  USING (
+    patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid())
+    OR is_care_circle_member(patient_id, auth.uid())
+  );
+
+-- 12. Invitations Policies
+CREATE POLICY "View invitations"
+  ON invitations FOR SELECT
+  USING (
+    patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid())
+    OR invited_by = auth.uid()
+    OR invited_email IN (SELECT email FROM profiles WHERE id = auth.uid())
+  );
+
+CREATE POLICY "Create invitations"
+  ON invitations FOR INSERT
+  WITH CHECK (
+    patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid())
+    OR invited_by = auth.uid()
+  );
+
+CREATE POLICY "Update invitations"
+  ON invitations FOR UPDATE
+  USING (
+    patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid())
+    OR invited_by = auth.uid()
+    OR invited_email IN (SELECT email FROM profiles WHERE id = auth.uid())
+  );
+
+-- 13. Medication Schedules Policies
+CREATE POLICY "View medication schedules"
+  ON medication_schedules FOR SELECT
+  USING (
+    patient_id IN (SELECT id FROM patient_profiles WHERE user_id = auth.uid())
+    OR is_care_circle_member(patient_id, auth.uid())
+  );
+
+CREATE POLICY "Manage medication schedules"
+  ON medication_schedules FOR ALL
+  USING (can_manage_meds(patient_id, auth.uid()));
+
+-- 14. Notification Preferences Policies
+CREATE POLICY "Users can manage own notification preferences"
+  ON notification_preferences FOR ALL
+  USING (user_id = auth.uid());
+
+-- 15. Notification Delivery Logs Policies
+CREATE POLICY "View delivery logs"
+  ON notification_delivery_logs FOR SELECT
+  USING (
+    notification_id IN (
+      SELECT id FROM notifications WHERE recipient_id = auth.uid()
+    )
+  );
+

@@ -51,9 +51,11 @@ export class EmailService {
       };
     }
 
-    // Check deduplication
+    // Check deduplication (only deduplicate if previously delivered successfully or simulated)
     if (opts.dedupHash) {
-      const existing = db.getAllNotifications().find(n => n.dedup_hash === opts.dedupHash);
+      const existing = db.getAllNotifications().find(
+        n => n.dedup_hash === opts.dedupHash && (n.status === 'sent' || n.status === 'simulated')
+      );
       if (existing) {
         return {
           success: true,
@@ -90,6 +92,17 @@ export class EmailService {
             dedup_hash: opts.dedupHash,
             metadata: { error: response.error, ...opts.metadata }
           });
+
+          db.createDeliveryLog({
+            id: uuidv4(),
+            notification_id: notification.id,
+            provider: 'resend',
+            status: 'failed',
+            attempt_count: 1,
+            error_message: response.error.message,
+            created_at: new Date().toISOString()
+          });
+
           return {
             success: false,
             provider: 'resend',
@@ -114,6 +127,16 @@ export class EmailService {
           metadata: { resendId: response.data?.id, ...opts.metadata }
         });
 
+        db.createDeliveryLog({
+          id: uuidv4(),
+          notification_id: notification.id,
+          provider: 'resend',
+          status: 'delivered',
+          attempt_count: 1,
+          response_payload: { resendId: response.data?.id },
+          created_at: new Date().toISOString()
+        });
+
         return {
           success: true,
           provider: 'resend',
@@ -136,6 +159,17 @@ export class EmailService {
           dedup_hash: opts.dedupHash,
           metadata: { error: err.message, ...opts.metadata }
         });
+
+        db.createDeliveryLog({
+          id: uuidv4(),
+          notification_id: notification.id,
+          provider: 'resend',
+          status: 'failed',
+          attempt_count: 1,
+          error_message: err.message,
+          created_at: new Date().toISOString()
+        });
+
         return {
           success: false,
           provider: 'resend',
@@ -166,6 +200,15 @@ export class EmailService {
         }
       });
 
+      db.createDeliveryLog({
+        id: uuidv4(),
+        notification_id: notification.id,
+        provider: 'simulator',
+        status: 'simulated',
+        attempt_count: 1,
+        created_at: new Date().toISOString()
+      });
+
       console.log(`[EmailService:Simulator] Dispatched simulated email to ${opts.recipientEmail}: "${opts.subject}"`);
 
       return {
@@ -176,6 +219,7 @@ export class EmailService {
         message: 'Dispatched to development notification simulator.'
       };
     }
+
   }
 
   /**

@@ -35,13 +35,22 @@ export class CareScoreService {
     const missedDoses = records.filter(r => r.status === 'missed').length;
     const pendingDoses = records.filter(r => r.status === 'upcoming' || r.status === 'due_now').length;
 
+    // Doses that have become due so far today:
+    const dosesDueSoFar = completedDoses + missedDoses;
+
     let doseScore = 0;
-    let doseAdherencePercentage = 0;
-    if (scheduledDoses > 0) {
-      doseAdherencePercentage = Math.round((completedDoses / scheduledDoses) * 100);
-      doseScore = (completedDoses / scheduledDoses) * 70; // 70% weight
+    let doseAdherencePercentage = 100;
+
+    if (dosesDueSoFar > 0) {
+      doseAdherencePercentage = Math.round((completedDoses / dosesDueSoFar) * 100);
+      doseScore = (completedDoses / dosesDueSoFar) * 70; // 70% weight
+    } else if (scheduledDoses > 0) {
+      // Doses are scheduled for today, but none due yet (all on track)
+      doseAdherencePercentage = 100;
+      doseScore = 70;
     } else {
-      doseScore = 70; // No medications scheduled today
+      // No medications scheduled today
+      doseScore = 70;
       doseAdherencePercentage = 100;
     }
 
@@ -51,9 +60,16 @@ export class CareScoreService {
     const totalScore = Math.min(100, Math.round(doseScore + wellbeingScore));
 
     let rating: DailyCareScoreBreakdown['rating'] = 'In Progress';
-    if (totalScore >= 90) rating = 'Excellent';
-    else if (totalScore >= 70) rating = 'Good';
-    else if (missedDoses > 0 || (pendingDoses === 0 && totalScore < 70)) rating = 'Needs Attention';
+    if (missedDoses > 0) {
+      rating = 'Needs Attention';
+    } else if (totalScore >= 90) {
+      rating = 'Excellent';
+    } else if (totalScore >= 70) {
+      rating = 'Good';
+    } else if (pendingDoses === 0 && totalScore < 70) {
+      rating = 'Needs Attention';
+    }
+
 
     return {
       date: targetDate,

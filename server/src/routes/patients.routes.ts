@@ -83,7 +83,7 @@ router.get('/:patientId', authorizePatientAccess('view'), (req: Request, res: Re
 });
 
 // PUT /api/patients/:patientId
-router.put('/:patientId', authorizePatientAccess('view'), (req: Request, res: Response): void => {
+router.put('/:patientId', authorizePatientAccess('manage_profile'), (req: Request, res: Response): void => {
   const patientId = req.params.patientId;
   const updateSchema = z.object({
     date_of_birth: z.string().optional(),

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
+import { config } from '../config/index.js';
 import { Invitation, CareCircleMember } from '../types/index.js';
 
 const router = Router();
@@ -22,8 +23,10 @@ const inviteSchema = z.object({
 });
 
 const resolvePatientId = (req: Request): string => {
-  if (req.query.patientId) return req.query.patientId as string;
-  if (req.body.patient_id) return req.body.patient_id;
+  const qPatient = (req.query.patientId || req.query.patient_id) as string;
+  if (qPatient) return qPatient;
+  if (req.body?.patient_id) return req.body.patient_id;
+  if (req.body?.patientId) return req.body.patientId;
   if (req.user?.role === 'elderly' && req.user.patient_id) return req.user.patient_id;
   if (req.user) {
     const memberships = db.getCareCircleMembershipsForUser(req.user.id);
@@ -109,10 +112,12 @@ router.post('/invite', (req: Request, res: Response): void => {
     invitation: {
       ...invitation,
       raw_token: rawToken, // displayed to user to share or send via email
-      invitation_code: rawToken.substring(0, 12).toUpperCase() // short readable code
+      invitation_code: rawToken.substring(0, 12).toUpperCase(), // short readable code
+      invite_url: `${config.clientUrl}/care-circle?token=${rawToken}`
     }
   });
 });
+
 
 // POST /api/care-circle/accept - accept invitation with token
 router.post('/accept', (req: Request, res: Response): void => {
