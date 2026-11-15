@@ -9,7 +9,7 @@
       "root": "server",
       "framework": "express",
       "entrypoint": "server.js",
-      "buildCommand": "npm run build"
+      "buildCommand": "echo 'Careverse server ready'"
     }
   },
   "rewrites": [
