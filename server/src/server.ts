@@ -46,6 +46,18 @@ if (config.nodeEnv !== 'test') {
   app.use(morgan('dev'));
 }
 
+// Normalize Vercel serverless request URL across all routing variations
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api/index.js')) {
+    if (req.originalUrl && !req.originalUrl.startsWith('/api/index.js')) {
+      req.url = req.originalUrl;
+    } else if (typeof req.headers['x-matched-path'] === 'string') {
+      req.url = req.headers['x-matched-path'];
+    }
+  }
+  next();
+});
+
 // Global rate limiting
 app.use(['/api', '/auth', '/patients', '/medications', '/appointments', '/care-circle', '/wellbeing', '/care-notes', '/notifications', '/carebuddy', '/analytics', '/emergency', '/audit', '/system'], apiLimiter);
 

@@ -1,35 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "client": {
-      "root": "client",
-      "framework": "vite"
-    },
-    "server": {
-      "root": "server",
-      "framework": "express",
-      "entrypoint": "server.js",
-      "buildCommand": "echo 'Careverse server ready'"
-    }
-  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "client/dist",
   "rewrites": [
     {
-      "source": "/api",
-      "destination": {
-        "service": "server"
-      }
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
     },
     {
-      "source": "/api/(.*)",
-      "destination": {
-        "service": "server"
-      }
+      "source": "/api",
+      "destination": "/api/index.js"
     },
     {
       "source": "/(.*)",
-      "destination": {
-        "service": "client"
-      }
+      "destination": "/index.html"
     }
   ]
 }

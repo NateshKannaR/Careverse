@@ -70561,6 +70561,16 @@ app.use(import_express14.default.urlencoded({ extended: true }));
 if (config.nodeEnv !== "test") {
   app.use((0, import_morgan.default)("dev"));
 }
+app.use((req, res, next) => {
+  if (req.url.startsWith("/api/index.js")) {
+    if (req.originalUrl && !req.originalUrl.startsWith("/api/index.js")) {
+      req.url = req.originalUrl;
+    } else if (typeof req.headers["x-matched-path"] === "string") {
+      req.url = req.headers["x-matched-path"];
+    }
+  }
+  next();
+});
 app.use(["/api", "/auth", "/patients", "/medications", "/appointments", "/care-circle", "/wellbeing", "/care-notes", "/notifications", "/carebuddy", "/analytics", "/emergency", "/audit", "/system"], apiLimiter);
 var routeList = [
   ["/auth", auth_routes_default],
