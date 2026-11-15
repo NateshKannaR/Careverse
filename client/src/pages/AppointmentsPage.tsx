@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext.js';
 import { api } from '../services/api.js';
 import { AddAppointmentModal } from '../components/appointment/AddAppointmentModal.js';
 import { CareBuddyWidget } from '../components/carebuddy/CareBuddyWidget.js';
+import { downloadAppointmentIcs } from '../utils/icsCalendar.js';
 import {
   Calendar,
   Clock,
@@ -14,7 +15,8 @@ import {
   Square,
   AlertCircle,
   FileCheck,
-  XCircle
+  XCircle,
+  Download
 } from 'lucide-react';
 
 export const AppointmentsPage: React.FC = () => {
@@ -170,7 +172,15 @@ export const AppointmentsPage: React.FC = () => {
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-400 font-medium">Status: Confirmed</span>
+                  <button
+                    onClick={() => downloadAppointmentIcs(appt)}
+                    className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold flex items-center gap-1.5 transition border border-teal-200"
+                    title="Export to Apple / Google / Outlook Calendar (.ics)"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Add to Calendar (.ics)</span>
+                  </button>
+
                   <button
                     onClick={() => handleCancelAppointment(appt.id)}
                     className="text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 transition"

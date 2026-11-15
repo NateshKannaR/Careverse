@@ -18,9 +18,11 @@ import {
   UserCheck,
   Menu,
   X,
-  Mail
+  Mail,
+  KeyRound
 } from 'lucide-react';
 import { UserRole } from '../../types/index.js';
+import { PasscodeCircleModal } from '../carecircle/PasscodeCircleModal.js';
 
 export const Navbar: React.FC = () => {
   const { user, logout, demoLogin } = useAuth();
@@ -29,6 +31,7 @@ export const Navbar: React.FC = () => {
 
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const [passcodeModalOpen, setPasscodeModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
@@ -102,6 +105,18 @@ export const Navbar: React.FC = () => {
                 <Mail className="w-3.5 h-3.5 text-sky-600" />
                 <span className="hidden xl:inline">Simulated Inbox</span>
               </button>
+
+              {/* Passcode Care Circle Modal Button */}
+              {user && (
+                <button
+                  onClick={() => setPasscodeModalOpen(true)}
+                  className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl border border-amber-200 transition"
+                  title="Passcode Care Circle Joining & Approvals"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Passcode Circle</span>
+                </button>
+              )}
 
               {/* Prominent Emergency SOS button */}
               {user && (
@@ -240,6 +255,13 @@ export const Navbar: React.FC = () => {
       <NotificationSimulatorModal
         isOpen={simulatorOpen}
         onClose={() => setSimulatorOpen(false)}
+      />
+
+      {/* Passcode Care Circle Modal */}
+      <PasscodeCircleModal
+        isOpen={passcodeModalOpen}
+        onClose={() => setPasscodeModalOpen(false)}
+        patientId={user?.patient_id}
       />
     </>
   );

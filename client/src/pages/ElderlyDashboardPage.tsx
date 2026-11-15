@@ -4,6 +4,8 @@ import { useLanguage } from '../context/LanguageContext.js';
 import { useA11y } from '../context/A11yContext.js';
 import { api } from '../services/api.js';
 import { DoseTimeline } from '../components/medication/DoseTimeline.js';
+import { RefillPredictionWidget } from '../components/medication/RefillPredictionWidget.js';
+import { AdherenceInsightsCard } from '../components/analytics/AdherenceInsightsCard.js';
 import { AddMedicationModal } from '../components/medication/AddMedicationModal.js';
 import { AddAppointmentModal } from '../components/appointment/AddAppointmentModal.js';
 import { DailyCheckInModal } from '../components/wellbeing/DailyCheckInModal.js';
@@ -201,6 +203,12 @@ export const ElderlyDashboardPage: React.FC = () => {
 
             <DoseTimeline records={doses} onDoseUpdated={fetchDashboardData} canManageMeds={true} />
           </div>
+
+          {/* Adherence Pattern Insights & Habit Guidance */}
+          <AdherenceInsightsCard patientId={user?.patient_id} />
+
+          {/* Days-to-Depletion Refill Forecast Engine */}
+          <RefillPredictionWidget patientId={user?.patient_id} />
         </div>
 
         {/* Right 1 Column: Wellbeing, Appointments, Care Circle, Quick Actions */}

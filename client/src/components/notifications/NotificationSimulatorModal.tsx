@@ -48,6 +48,18 @@ export const NotificationSimulatorModal: React.FC<NotificationSimulatorModalProp
     }
   };
 
+  const handleTriggerSpecificReminder = async (type: string) => {
+    setSendingTest(true);
+    try {
+      await api.post('/audit/trigger-reminder', { type });
+      await fetchSimulatorLogs();
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message || 'Error triggering reminder');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -79,14 +91,6 @@ export const NotificationSimulatorModal: React.FC<NotificationSimulatorModalProp
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleSendTestNotification}
-              disabled={sendingTest}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-            >
-              <Send className="w-3.5 h-3.5" />
-              {sendingTest ? 'Sending...' : 'Send Test Notification'}
-            </button>
-            <button
               onClick={fetchSimulatorLogs}
               className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition"
               title="Refresh logs"
@@ -100,6 +104,48 @@ export const NotificationSimulatorModal: React.FC<NotificationSimulatorModalProp
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
+
+        {/* Evaluator Interactive Trigger Toolbar */}
+        <div className="p-3 bg-teal-950/90 border-b border-teal-800/50 flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-bold text-teal-300 flex items-center gap-1.5 mr-2">
+            <span>⚡ Evaluator Live Triggers:</span>
+          </span>
+          <button
+            onClick={() => handleTriggerSpecificReminder('upcoming_dose_15m')}
+            disabled={sendingTest}
+            className="px-2.5 py-1 rounded-lg bg-teal-600/40 hover:bg-teal-600 text-teal-200 border border-teal-500/40 font-semibold transition disabled:opacity-50"
+          >
+            Upcoming Dose (-15m)
+          </button>
+          <button
+            onClick={() => handleTriggerSpecificReminder('missed_dose_15m')}
+            disabled={sendingTest}
+            className="px-2.5 py-1 rounded-lg bg-amber-600/40 hover:bg-amber-600 text-amber-200 border border-amber-500/40 font-semibold transition disabled:opacity-50"
+          >
+            Stage 1 Overdue (+15m)
+          </button>
+          <button
+            onClick={() => handleTriggerSpecificReminder('missed_dose_60m')}
+            disabled={sendingTest}
+            className="px-2.5 py-1 rounded-lg bg-rose-600/40 hover:bg-rose-600 text-rose-200 border border-rose-500/40 font-semibold transition disabled:opacity-50"
+          >
+            Stage 2 Urgent (+60m)
+          </button>
+          <button
+            onClick={() => handleTriggerSpecificReminder('appointment_24h')}
+            disabled={sendingTest}
+            className="px-2.5 py-1 rounded-lg bg-blue-600/40 hover:bg-blue-600 text-blue-200 border border-blue-500/40 font-semibold transition disabled:opacity-50"
+          >
+            Appt Reminder (24h)
+          </button>
+          <button
+            onClick={() => handleTriggerSpecificReminder('refill_alert')}
+            disabled={sendingTest}
+            className="px-2.5 py-1 rounded-lg bg-purple-600/40 hover:bg-purple-600 text-purple-200 border border-purple-500/40 font-semibold transition disabled:opacity-50"
+          >
+            Refill Alert
+          </button>
         </div>
 
         {/* Content split pane */}

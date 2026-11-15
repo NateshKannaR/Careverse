@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
 import { api } from '../services/api.js';
 import { CareBuddyWidget } from '../components/carebuddy/CareBuddyWidget.js';
+import { RefillPredictionWidget } from '../components/medication/RefillPredictionWidget.js';
+import { AdherenceInsightsCard } from '../components/analytics/AdherenceInsightsCard.js';
 import {
   Heart,
   Users,
@@ -213,6 +215,12 @@ export const FamilyDashboardPage: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* Adherence Pattern Detector with Lifestyle Cues */}
+          {selectedPatientId && <AdherenceInsightsCard patientId={selectedPatientId} />}
+
+          {/* Days-to-Depletion Refill Forecast Widget */}
+          {selectedPatientId && <RefillPredictionWidget patientId={selectedPatientId} />}
         </div>
 
         {/* Right Column: Care Notes & Messages */}

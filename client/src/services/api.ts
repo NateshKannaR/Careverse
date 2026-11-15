@@ -9,12 +9,62 @@ const getAuthHeaders = (): Record<string, string> => {
 const handleResponse = async <T = any>(res: Response): Promise<T> => {
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `HTTP request failed with status ${res.status}`);
+    const error: any = new Error(errorData.error || `HTTP request failed with status ${res.status}`);
+    error.response = { status: res.status, data: errorData };
+    throw error;
   }
   return res.json();
 };
 
+const normalizeUrl = (url: string): string => {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/api')) return url;
+  return `/api${url.startsWith('/') ? url : `/${url}`}`;
+};
+
 export const api = {
+  // Generic HTTP helpers compatible with axios conventions (e.g. res.data, err.response.data)
+  get: async <T = any>(url: string) => {
+    const res = await fetch(normalizeUrl(url), { headers: getAuthHeaders() });
+    const data = await handleResponse<T>(res);
+    return { data };
+  },
+  post: async <T = any>(url: string, body?: any) => {
+    const res = await fetch(normalizeUrl(url), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await handleResponse<T>(res);
+    return { data };
+  },
+  patch: async <T = any>(url: string, body?: any) => {
+    const res = await fetch(normalizeUrl(url), {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await handleResponse<T>(res);
+    return { data };
+  },
+  put: async <T = any>(url: string, body?: any) => {
+    const res = await fetch(normalizeUrl(url), {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await handleResponse<T>(res);
+    return { data };
+  },
+  delete: async <T = any>(url: string) => {
+    const res = await fetch(normalizeUrl(url), {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    const data = await handleResponse<T>(res);
+    return { data };
+  },
+
   // Auth
   auth: {
     login: (body: any) =>
@@ -60,7 +110,11 @@ export const api = {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ status, notes })
-      }).then(handleResponse)
+      }).then(handleResponse),
+    getRefillForecast: (patientId?: string) => {
+      const q = patientId ? `?patient_id=${patientId}` : '';
+      return fetch(`/api/medications/refills/forecast${q}`, { headers: getAuthHeaders() }).then<any>(handleResponse);
+    }
   },
 
   // Appointments
@@ -161,6 +215,10 @@ export const api = {
     getDailyScore: (patientId?: string) => {
       const q = patientId ? `?patientId=${patientId}` : '';
       return fetch(`/api/analytics/daily-score${q}`, { headers: getAuthHeaders() }).then<any>(handleResponse);
+    },
+    getAdherencePatterns: (patientId?: string) => {
+      const q = patientId ? `?patient_id=${patientId}` : '';
+      return fetch(`/api/analytics/adherence-patterns${q}`, { headers: getAuthHeaders() }).then<any>(handleResponse);
     },
     getExportUrl: (patientId?: string) => `/api/analytics/export-csv${patientId ? `?patientId=${patientId}` : ''}`
   },
