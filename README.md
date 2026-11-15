@@ -15,11 +15,38 @@
 
 *A production-grade, full-stack, clinically-guarded healthcare management platform built specifically for seniors, their families, and clinical caregivers.*
 
-[Quick Start](#-quick-start) • [Evaluator Tour Guide](#-interactive-evaluator-tour-guide-5-minute-walkthrough) • [Core Innovations](#-core-innovations--clinical-superpowers) • [Architecture](#-system-architecture) • [Security](#-enterprise-grade-security--threat-model) • [Testing Matrix](#-automated-testing-matrix-67-tests)
+[Quick Start](#-quick-start) • [Screenshots](#-application-showcase--screenshots) • [Evaluator Tour Guide](#-interactive-evaluator-tour-guide-5-minute-walkthrough) • [Core Innovations](#-core-innovations--clinical-superpowers) • [Architecture](#-system-architecture) • [Security](#-enterprise-grade-security--threat-model) • [Testing Matrix](#-automated-testing-matrix-67-tests)
 
 ---
 
 </div>
+
+## 📸 Application Showcase & Screenshots
+
+<div align="center">
+
+### 1. Elderly Healthcare Portal & Focus Dose Dashboard
+*Patient-centric simplicity featuring high-contrast typography, 94% Routine Care Score radial gauge, 1-click 'Mark as Taken' medication focus card, Days-to-Depletion Refill Forecast, and Adherence Pattern Insights.*
+
+<img src="docs/screenshots/elderly-dashboard.jpg" alt="CAREVERSE Elderly Dashboard" width="950" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);" />
+
+<br/><br/>
+
+### 2. Family Care Member Portal & Routine Care Digest
+*Real-time visibility for family members: Automated daily care digest for Eleanor Vance, today's vitals & dose tracking (2 of 3 taken), scheduled doctor visits, and supportive care circle notes feed.*
+
+<img src="docs/screenshots/family-portal.jpg" alt="CAREVERSE Family Portal" width="950" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);" />
+
+<br/><br/>
+
+### 3. Passcode Care Circle & Elder Sovereignty Gate
+*Secure care circle connection via bcrypt-hashed passcodes (pre-seeded with `CARE-2026`). Features brute-force lockout (5 attempts / 15m) and the Elder Sovereignty Gate requiring explicit senior approval before access is granted.*
+
+<img src="docs/screenshots/passcode-circle.jpg" alt="CAREVERSE Passcode Circle Modal" width="950" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);" />
+
+</div>
+
+---
 
 ## 📌 Executive Summary & Problem Statement Alignment
 
