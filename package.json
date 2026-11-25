@@ -13,7 +13,10 @@
     "build": "npm run build --workspace=server && npm run build --workspace=client",
     "test": "npm run test --workspace=server && npm run test --workspace=client",
     "test:server": "npm run test --workspace=server",
-    "test:client": "npm run test --workspace=client"
+    "test:client": "npm run test --workspace=client",
+    "lint": "npm run lint:server && npm run lint:client",
+    "lint:server": "tsc --noEmit --project server/tsconfig.json",
+    "lint:client": "tsc --noEmit --project client/tsconfig.json"
   },
   "keywords": [
     "elderly-care",
