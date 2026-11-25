@@ -83,7 +83,7 @@ The benchmark column is a reference for comparing features. See the adherence ch
 | **Emergency SOS Safety** | Single-click alert | Simple alert prompt | **5-Second audible countdown cancellation window** |
 | **Accessibility Compliance** | Standard web UI | English only, default CSS | **WCAG 2.2 AA (125% Text, 7:1+ Contrast, En/Ta/Hi)** |
 | **Evaluator Testing Experience** | Log inspection | Manual DB manipulation | **In-App Simulator Playground with On-Demand Triggers** |
-| **Cloud Deployment Manifest** | Generic Dockerfile | None | **Unified Vercel Multi-Service (`vercel.json`)** |
+| **Cloud Deployment Manifest** | Generic Dockerfile | None | **Vercel static client and Express function (`vercel.json`)** |
 
 ---
 
@@ -493,48 +493,13 @@ Follow this 5-minute checklist to evaluate CAREVERSE:
 
 ---
 
-## 🌐 Vercel Multi-Service Deployment Architecture
+## Deploy on Vercel
 
-CAREVERSE is pre-configured to deploy seamlessly on Vercel as a multi-service unified project via [`vercel.json`](file:///home/natesh/Downloads/Careverse/vercel.json):
+Connect the repository and use its root as the project’s Root Directory. The [Vercel configuration](vercel.json) installs the workspace dependencies, runs `npm run build`, and publishes `client/dist`. It routes `/api` requests to the Express function and sends client routes such as `/login` and `/dashboard` to the React entry page. Existing static files take precedence.
 
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "app": {
-      "root": ".",
-      "runtime": "container"
-    },
-    "client": {
-      "root": "client",
-      "framework": "vite"
-    },
-    "server": {
-      "root": "server",
-      "framework": "express"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": {
-        "service": "server"
-      }
-    },
-    {
-      "source": "/(.*)",
-      "destination": {
-        "service": "client"
-      }
-    }
-  ]
-}
-```
+Set a unique `JWT_SECRET` for the deployed project. The Vercel function uses temporary storage for its demonstration records. Function restarts may reset those records. The standalone server runs scheduled reminders.
 
-- **Unified Single Domain**: No CORS friction between frontend and backend.
-- **Client Service**: Serves the optimized Vite production bundle with client-side history routing.
-- **Server Service**: Serves Express REST endpoints, WebSocket/cron reminder engines, and AI companion.
-- **Container Service (`app`)**: Provides a unified root container option for enterprise private clouds or Docker environments.
+After deploying, check `/`, `/login`, and `/api/health` directly. The API health endpoint returns JSON with `"status":"healthy"`. A successful homepage response alone does not verify the API.
 
 ---
 

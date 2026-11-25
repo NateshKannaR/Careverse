@@ -4,6 +4,7 @@ node_modules/
 .pnp.js
 
 # Build outputs
+.vercel/
 client/dist/
 build/
 *.tsbuildinfo
