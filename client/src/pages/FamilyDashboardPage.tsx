@@ -217,7 +217,7 @@ export const FamilyDashboardPage: React.FC = () => {
           </div>
 
           {/* Adherence Pattern Detector with Lifestyle Cues */}
-          {selectedPatientId && <AdherenceInsightsCard patientId={selectedPatientId} />}
+          {selectedPatientId && <AdherenceInsightsCard key={selectedPatientId} patientId={selectedPatientId} />}
 
           {/* Days-to-Depletion Refill Forecast Widget */}
           {selectedPatientId && <RefillPredictionWidget patientId={selectedPatientId} />}

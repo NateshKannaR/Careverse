@@ -100,6 +100,8 @@ export interface AdherenceInsight {
   total_scheduled_week: number;
   total_taken_week: number;
   total_missed_week: number;
+  total_pending_week: number;
+  time_zone: string;
   patterns: AdherencePattern[];
   disclaimer: string;
 }

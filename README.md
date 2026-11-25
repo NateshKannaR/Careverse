@@ -15,7 +15,7 @@
 
 *A production-grade, full-stack, clinically-guarded healthcare management platform built specifically for seniors, their families, and clinical caregivers.*
 
-[Quick Start](#-quick-start) • [Screenshots](#-application-showcase--screenshots) • [Evaluator Scorecard (100/100)](#-hackathon-evaluator-scorecard-100--100) • [Benchmark Comparison](#-competitive-benchmark-matrix-careverse-vs-competitors) • [Core Innovations](#-core-innovations--clinical-superpowers) • [Architecture](#-system-architecture) • [Security](#-enterprise-grade-security--threat-model) • [API Reference](#-complete-rest-api-specification) • [Testing Matrix](#-automated-testing-matrix-67-tests)
+[Quick Start](#-quick-start) • [Screenshots](#-application-showcase--screenshots) • [Evaluation Checklist](#-hackathon-evaluation-checklist) • [Benchmark Comparison](#-competitive-benchmark-matrix-careverse-vs-competitors) • [Core Innovations](#-core-innovations--clinical-superpowers) • [Architecture](#-system-architecture) • [Security](#-enterprise-grade-security--threat-model) • [API Reference](#-complete-rest-api-specification) • [Testing Matrix](#-automated-testing-matrix)
 
 ---
 
@@ -48,37 +48,37 @@
 
 ---
 
-## 🥇 Hackathon Evaluator Scorecard (100 / 100)
+## 🥇 Hackathon Evaluation Checklist
 
-CAREVERSE was engineered to directly achieve a **perfect 100% evaluation** across all 6 rigorous hackathon dimensions:
+This checklist maps project evidence to six evaluation dimensions. The points are preparation targets.
 
-| Dimension | Max | Score | Concrete Evidence in Codebase |
+| Dimension | Max | Target | Concrete Evidence in Codebase |
 | :--- | :---: | :---: | :--- |
-| **1. Code Quality & Architecture** | 10 | **10** | Strict TypeScript across client & server, modular route-service-repository pattern, zero `any` shortcuts in core engines, clean separation of concerns, 0 compilation warnings. |
+| **1. Code Quality & Architecture** | 10 | **10** | Strict TypeScript across client & server, modular route-service-repository pattern, with separate client, route, service, and storage layers. |
 | **2. Security & Threat Modeling** | 10 | **10** | Comprehensive BOLA/IDOR protection middleware (`checkPatientAccess`), 10-round bcrypt salted passcodes, constant-time compare, 5-strike brute-force lockout (`HTTP 429`), 15 Supabase RLS policies. |
-| **3. Efficiency & Reliability** | 10 | **10** | Atomic persistent file/memory storage adapter with sub-10ms response times, 60s background cron daemon with deduplication and retry queues, deterministic UTC calendar serialization. |
-| **4. Testing Excellence** | 10 | **10** | **67 automated unit and integration tests** across 14 test suites with 100% pass rate. Covers BOLA security isolation, passcode brute-force lockouts, RFC 5545 parsing, dose idempotency, and WCAG A11y. |
+| **3. Efficiency & Reliability** | 10 | **10** | File-backed demo storage, a reminder loop for the standalone server, and patient-local reporting for recorded doses. |
+| **4. Testing Excellence** | 10 | **10** | **82 automated unit and integration tests** across 15 test suites, including 15 synthetic adherence scenarios. Covers BOLA security isolation, passcode brute-force lockouts, RFC 5545 parsing, dose idempotency, and WCAG A11y. |
 | **5. Accessibility (WCAG 2.2 AA)** | 10 | **10** | **125% Large Text scaling**, **7:1+ High-Contrast theme**, live screen reader announcements (`aria-live="polite"`), Web Speech API audible voice synthesis, trilingual localization (**English, தமிழ், हिन्दी**). |
 | **6. Problem Statement Alignment & Innovation** | 10 | **10** | Closed-loop elderly care: Passcode Care Circle with Elder Sovereignty Gate (`CARE-2026`), RFC 5545 dual-alarm calendar export, Days-to-Depletion refill forecasting, slot-based adherence pattern detector with habit cues, and Emergency SOS 5s cancellation. |
-| **TOTAL EVALUATION SCORE** | **60** | **60 / 60 (100%)** | **Unanimous Grand Prize Winner** |
+| **Total available points** | **60** | **60** | Refer to the measured test results below. |
 
 ---
 
 ## 🥊 Competitive Benchmark Matrix (CAREVERSE vs Competitors)
 
-How CAREVERSE stacks up against the top hackathon benchmark (96.98%) and typical prototypes:
+The benchmark column is a reference for comparing features. See the adherence checks below for a measured comparison against the previous Careverse build.
 
-| Feature / Metric | Benchmark (96.98%) | Typical Hackathon Prototype | 🌟 **CAREVERSE (100% Winner)** |
+| Feature / Metric | Benchmark (96.98%) | Typical Hackathon Prototype | **CAREVERSE** |
 | :--- | :---: | :---: | :--- |
-| **Automated Tests** | 41 Tests | 5–10 Tests (or fabricated) | **67 Real Automated Tests (100% Passing)** |
-| **Test Suites** | 7 Suites | 1–2 Suites | **14 Dedicated Suites (Server & Client)** |
+| **Automated Tests** | 41 Tests | 5–10 Tests (or fabricated) | **82 automated tests** |
+| **Test Suites** | 7 Suites | 1–2 Suites | **15 suites (Server & Client)** |
 | **Cross-Patient Security (BOLA/IDOR)** | Partial / Unchecked | None (Vulnerable to IDOR) | **Hardened `checkPatientAccess` on all routes (403)** |
 | **Care Circle Onboarding** | Passcode Only | Insecure shared passwords | **Bcrypt (10 rounds) + Elder Sovereignty Gate** |
 | **Brute-Force Rate Limiting** | Basic IP limit | None | **Sliding 15m window (429 Too Many Requests)** |
 | **Pre-Seeded Demo Passcode** | `CARE-2026` | None | **`CARE-2026` (Hyphen-tolerant, instant testing)** |
 | **Calendar Synchronization** | Basic .ics | None | **RFC 5545 .ics with Dual Alarms (`-PT24H` & `-PT2H`)** |
 | **Medication Refill Engine** | Static counter | Hardcoded number | **Mathematical Days-to-Depletion ($\lfloor \frac{\text{stock}}{\text{daily}} \rfloor$)** |
-| **Adherence Pattern Intelligence** | Simple graph | Flat percentage | **4 UTC Slots + Cognitive Habit Cues + Voice** |
+| **Adherence Pattern Intelligence** | Simple graph | Flat percentage | **Patient-local time slots, recorded outcomes and spoken reminders** |
 | **Double-Dose Prevention** | Not strictly enforced | Duplicate entries allowed | **Idempotent state machine with HTTP 400 rejection** |
 | **Emergency SOS Safety** | Single-click alert | Simple alert prompt | **5-Second audible countdown cancellation window** |
 | **Accessibility Compliance** | Standard web UI | English only, default CSS | **WCAG 2.2 AA (125% Text, 7:1+ Contrast, En/Ta/Hi)** |
@@ -117,11 +117,11 @@ cd Careverse
 npm install
 ```
 
-### 2. Run the Full Automated Test Suite (67 Tests)
+### 2. Run the Full Automated Test Suite
 ```bash
 npm test
 ```
-*Executes all 10 server integration/security test suites and 4 client component/RFC suites. All 67 tests pass with exit code 0.*
+*Executes the server and client suites, including the synthetic adherence scenarios.*
 
 ### 3. Start Development Servers
 Run backend API and frontend Vite client simultaneously:
@@ -194,16 +194,11 @@ Traditional healthcare apps rely either on insecure shared passwords or complex 
   - 🚨 **Urgent Refill Required**: $\le 7$ days supply remaining.
 - Visual depletion progress meters on both Elderly and Family dashboards with 1-click **"Request Pharmacy Refill"** alerts sent directly to caregivers.
 
-### 4. Clinical Adherence Pattern Detector with Habit Cues
-- Evaluates medication logs across 4 clinical time-of-day slots:
-  - **Morning** (05:00 – 11:00 UTC)
-  - **Afternoon** (11:00 – 16:00 UTC)
-  - **Evening** (16:00 – 21:00 UTC)
-  - **Bedtime** (21:00 – 05:00 UTC)
-- Surfaces recurring drop-off patterns when a slot exhibits $\ge 25\%$ or $\ge 2$ missed doses over the last 14 days.
-- **Behavioral Habit-Pairing Cues**: Recommends proven cognitive associations rather than generic alarms (e.g. *"Place medication organizer beside your morning kettle"*, *"Pair evening dose with dinner or the evening news"*).
-- **Web Speech API Read-Aloud**: High-clarity audible speech synthesis for seniors.
-- **Clinical Safety Disclaimer**: Explicitly displays: *"Rule-based adherence insight only. Not medical advice. Always consult your doctor before modifying medication schedules."*
+### 4. Adherence Pattern Detector
+- Groups recorded dose outcomes into morning, afternoon, evening, and bedtime using the patient profile’s time zone.
+- Computes the rate from taken, missed, and skipped outcomes. Displays due doses that lack an outcome separately.
+- Flags recurring missed or skipped doses over the last 14 local calendar days when a slot has at least three recorded outcomes.
+- Offers a reminder to log doses at the prescribed time and supports speech read-aloud.
 
 ### 5. Interactive Notification & Escalation Playground
 - Click the **"Simulator"** button in the top navigation bar to open the real-time notification inspector.
@@ -387,14 +382,27 @@ Comprehensive SQL migration files define row-level isolation in production:
 
 ---
 
-## 🧪 Automated Testing Matrix (67 Tests)
+## Adherence accuracy checks
 
-The test suite features **67 automated unit and integration tests** across 14 test suites with a **100% pass rate**:
+A fixed suite of 15 synthetic cases compares the adherence engine against expected results. It covers missing outcomes, future doses, skipped doses, archived prescriptions, streaks and patient time zones.
+
+| Version | Synthetic cases passed |
+| --- | ---: |
+| Base commit `52bff56` | 4 of 15 |
+| Updated adherence engine | 15 of 15 |
+
+Run the cases with `npm exec --workspace=server -- vitest run tests/unit/adherenceAccuracy.test.ts`. The suite evaluates the accuracy of adherence reporting on known inputs. Clinical accuracy and competition scoring require separate evidence.
+
+For a demo, open the patient dashboard with a due dose that has no recorded outcome. The card shows the pending count and “No outcomes.” Record the dose as skipped in the demo account and show how the recorded rate and the family dashboard update.
+
+## 🧪 Automated Testing Matrix
+
+The verified run passed **82 automated tests** across 15 suites:
 
 ```bash
-Server Test Files: 10 passed (10) | Server Tests: 53 passed (53)
+Server Test Files: 11 passed (11) | Server Tests: 68 passed (68)
 Client Test Files:  4 passed (4)  | Client Tests: 14 passed (14)
-Total Test Suite:  67 passed (67) | Pass Rate:   100%
+Total tests:       82 passed (82)
 ```
 
 | Domain | Test Suite File | Tests | Status | Verification Focus |
@@ -403,6 +411,7 @@ Total Test Suite:  67 passed (67) | Pass Rate:   100%
 | **Passcode Circles** | [`passcodeCircleFlow.test.ts`](file:///home/natesh/Downloads/Careverse/server/tests/integration/passcodeCircleFlow.test.ts) | 5 | ✅ **PASSED** | Generates 6-char codes, tests pre-seeded `CARE-2026`, validates elder approval, verifies 429 lockout |
 | **Cryptography** | [`passcodeAndRateLimit.test.ts`](file:///home/natesh/Downloads/Careverse/server/tests/unit/passcodeAndRateLimit.test.ts) | 6 | ✅ **PASSED** | Bcrypt hashing rounds, constant-time comparison, rate-limiting sliding window |
 | **Refills & Patterns** | [`refillAndAdherencePatterns.test.ts`](file:///home/natesh/Downloads/Careverse/server/tests/unit/refillAndAdherencePatterns.test.ts) | 6 | ✅ **PASSED** | Days-to-depletion forecast, urgent refill alert ($\le 7$ days), UTC slot classification, habit cues |
+| **Adherence accuracy** | [adherenceAccuracy.test.ts](server/tests/unit/adherenceAccuracy.test.ts) | 15 | ✅ **PASSED** | Outcomes, windows, pending and future doses, archived prescriptions, streaks, and time zones |
 | **Auth & RBAC** | [`authAndRbac.test.ts`](file:///home/natesh/Downloads/Careverse/server/tests/integration/authAndRbac.test.ts) | 6 | ✅ **PASSED** | 401 unauthenticated requests, patient auto-provisioning, role hierarchy enforcement |
 | **Medication Safety** | [`medicationDoses.test.ts`](file:///home/natesh/Downloads/Careverse/server/tests/integration/medicationDoses.test.ts) | 5 | ✅ **PASSED** | Idempotent administration, 400 rejection on duplicate dose ingestion, stock decrement |
 | **Care Circle & SOS** | [`careCircleAndEmergency.test.ts`](file:///home/natesh/Downloads/Careverse/server/tests/integration/careCircleAndEmergency.test.ts) | 6 | ✅ **PASSED** | Member invitation, acceptance, emergency SOS broadcast, audit trail entry creation |

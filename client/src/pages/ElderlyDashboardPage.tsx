@@ -205,7 +205,10 @@ export const ElderlyDashboardPage: React.FC = () => {
           </div>
 
           {/* Adherence Pattern Insights & Habit Guidance */}
-          <AdherenceInsightsCard patientId={user?.patient_id} />
+          <AdherenceInsightsCard
+            patientId={user?.patient_id}
+            doseRevision={doses.map(dose => `${dose.id}:${dose.status}`).join('|')}
+          />
 
           {/* Days-to-Depletion Refill Forecast Engine */}
           <RefillPredictionWidget patientId={user?.patient_id} />

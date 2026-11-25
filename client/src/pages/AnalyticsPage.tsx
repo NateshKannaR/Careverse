@@ -21,8 +21,7 @@ import {
   Calendar,
   CheckCircle2,
   AlertCircle,
-  Activity,
-  ArrowUpRight
+  Activity
 } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
@@ -103,22 +102,21 @@ export const AnalyticsPage: React.FC = () => {
           <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Average Adherence</span>
             <div className="text-2xl font-black text-teal-700 flex items-center gap-1">
-              <span>{adherenceData.averageAdherence}%</span>
-              <ArrowUpRight className="w-5 h-5 text-emerald-500" />
+              <span>{adherenceData.averageAdherence == null ? 'No outcomes' : `${adherenceData.averageAdherence}%`}</span>
             </div>
-            <span className="text-[10px] text-slate-400 mt-1 block">Past {timeRange} Days</span>
+            <span className="text-[10px] text-slate-400 mt-1 block">Recorded outcomes over {timeRange} days</span>
           </div>
 
           <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Doses Taken</span>
             <span className="text-2xl font-black text-emerald-600 block">{adherenceData.totalTaken}</span>
-            <span className="text-[10px] text-slate-400 mt-1 block">Of {adherenceData.totalScheduled} scheduled</span>
+            <span className="text-[10px] text-slate-400 mt-1 block">Of {adherenceData.totalScheduled} due · {adherenceData.totalPending ?? 0} without an outcome</span>
           </div>
 
           <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Missed Doses</span>
             <span className="text-2xl font-black text-rose-600 block">{adherenceData.totalMissed}</span>
-            <span className="text-[10px] text-slate-400 mt-1 block">Escalated to Care Circle</span>
+            <span className="text-[10px] text-slate-400 mt-1 block">{adherenceData.totalSkipped ?? 0} skipped</span>
           </div>
 
           <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
@@ -138,7 +136,7 @@ export const AnalyticsPage: React.FC = () => {
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
             <div>
               <h3 className="font-bold text-base text-navy-950">Daily Medication Adherence</h3>
-              <p className="text-xs text-slate-500">Scheduled vs Taken vs Missed Doses</p>
+              <p className="text-xs text-slate-500">Due doses by recorded status · {adherenceData?.timeZone ?? 'UTC'}</p>
             </div>
           </div>
 
@@ -160,6 +158,7 @@ export const AnalyticsPage: React.FC = () => {
                   <Bar dataKey="taken" name="Taken" fill="#0d9488" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="missed" name="Missed" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="skipped" name="Skipped" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="pending" name="Without outcome" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -208,7 +207,7 @@ export const AnalyticsPage: React.FC = () => {
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
                   <span className="font-medium text-slate-700">{cat.category}</span>
                 </div>
-                <span className="font-bold text-teal-800">{cat.rate}% Compliance</span>
+                <span className="font-bold text-teal-800">{cat.rate == null ? 'No outcomes' : `${cat.rate}% recorded adherence`}</span>
               </div>
             ))}
           </div>

@@ -1,55 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Flame, AlertCircle, Lightbulb, ShieldAlert, Sparkles, Volume2, CheckCircle2 } from 'lucide-react';
+import { Flame, AlertCircle, Lightbulb, ShieldAlert, Sparkles, Volume2 } from 'lucide-react';
 import { api } from '../../services/api';
 
-interface AdherencePattern {
-  slot_name: 'morning' | 'afternoon' | 'evening' | 'bedtime';
-  time_window: string;
-  total_scheduled: number;
-  missed_count: number;
-  missed_percentage: number;
-  suggestion: string;
-}
-
-interface AdherenceInsight {
-  has_data: boolean;
-  weekly_adherence_rate: number | null;
-  monthly_adherence_rate: number | null;
-  streak_days: number;
-  total_scheduled_week: number;
-  total_taken_week: number;
-  total_missed_week: number;
-  patterns: AdherencePattern[];
-  disclaimer: string;
-}
+import type { ClientAdherenceInsight } from '../../utils/adherenceInsights';
 
 interface AdherenceInsightsCardProps {
   patientId?: string;
+  doseRevision?: string;
   className?: string;
 }
 
 export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
   patientId,
+  doseRevision,
   className = ''
 }) => {
-  const [insight, setInsight] = useState<AdherenceInsight | null>(null);
+  const [insight, setInsight] = useState<ClientAdherenceInsight | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState(false);
   const [speaking, setSpeaking] = useState<boolean>(false);
 
   useEffect(() => {
-    const fetchInsight = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get(`/analytics/adherence-patterns${patientId ? `?patient_id=${patientId}` : ''}`);
-        setInsight(res.data.insight);
-      } catch (err) {
-        console.error('Failed to load adherence patterns', err);
-      } finally {
-        setLoading(false);
-      }
+    const controller = new AbortController();
+    let current = true;
+    setLoading(true);
+    setError(false);
+    api.analytics.getAdherencePatterns(patientId, controller.signal)
+      .then(({ insight: nextInsight }) => {
+        if (current) setInsight(nextInsight);
+      })
+      .catch(() => {
+        if (current) setError(true);
+      })
+      .finally(() => {
+        if (current) setLoading(false);
+      });
+    return () => {
+      current = false;
+      controller.abort();
     };
-    fetchInsight();
-  }, [patientId]);
+  }, [patientId, doseRevision]);
 
   const handleSpeakSuggestion = (text: string) => {
     if ('speechSynthesis' in window) {
@@ -72,11 +62,19 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
     );
   }
 
+  if (error) {
+    return (
+      <p role="alert" className={`p-6 rounded-2xl bg-slate-900 border border-slate-800 text-sm text-slate-200 ${className}`}>
+        Could not load adherence records.
+      </p>
+    );
+  }
+
   if (!insight || !insight.has_data) {
     return (
       <div className={`p-6 rounded-2xl bg-slate-900/80 border border-slate-800 text-center py-8 ${className}`}>
         <p className="text-sm font-semibold text-slate-300">No Adherence Data Yet</p>
-        <p className="text-xs text-slate-500 mt-1">Log your daily doses to unlock smart pattern analysis and habit streaks.</p>
+        <p className="text-xs text-slate-500 mt-1">Log dose outcomes to see adherence and recurring patterns.</p>
       </div>
     );
   }
@@ -87,12 +85,9 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-base font-bold text-white flex items-center space-x-2">
-            <span>Intelligent Adherence Pattern Detector</span>
-            <span className="p-1 rounded-md bg-teal-500/20 text-teal-300 text-[10px] font-bold">
-              CLINICAL AI
-            </span>
+            <span>Adherence insights</span>
           </h3>
-          <p className="text-xs text-slate-400">Rule-based pattern recognition across daily time-of-day slots</p>
+          <p className="text-xs text-slate-400">Dose times in {insight.time_zone}</p>
         </div>
 
         {/* Streak Counter Badge */}
@@ -107,7 +102,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
         <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
           <p className="text-xs text-slate-400">7-Day Adherence</p>
           <p className="text-xl font-bold text-teal-400 mt-1">
-            {insight.weekly_adherence_rate !== null ? `${insight.weekly_adherence_rate}%` : '--'}
+            {insight.weekly_adherence_rate == null ? 'No outcomes' : `${insight.weekly_adherence_rate}%`}
           </p>
         </div>
 
@@ -119,19 +114,24 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
         </div>
 
         <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
-          <p className="text-xs text-slate-400">Missed Doses</p>
+          <p className="text-xs text-slate-400">Missed or Skipped</p>
           <p className={`text-xl font-bold mt-1 ${insight.total_missed_week > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
             {insight.total_missed_week}
           </p>
         </div>
       </div>
 
+      <p className="text-xs text-slate-400">
+        Adherence uses recorded outcomes.
+        {insight.total_pending_week > 0 && ` ${insight.total_pending_week} due without an outcome.`}
+      </p>
+
       {/* Detected Patterns */}
       {insight.patterns.length > 0 ? (
         <div className="space-y-3">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center space-x-1.5">
             <AlertCircle className="w-3.5 h-3.5" />
-            <span>Habitual Missed Doses Detected</span>
+            <span>Recurring missed or skipped doses</span>
           </h4>
 
           {insight.patterns.map((pat, idx) => (
@@ -144,7 +144,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
                   {pat.slot_name} Slot ({pat.time_window})
                 </span>
                 <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  {pat.missed_percentage}% Missed ({pat.missed_count} doses)
+                  {pat.missed_count} of {pat.total_scheduled} recorded missed or skipped ({pat.missed_percentage}%)
                 </span>
               </div>
 
@@ -171,10 +171,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
           ))}
         </div>
       ) : (
-        <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center space-x-2.5 text-xs text-emerald-300">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-          <span>Great job! No habitual missed-dose patterns detected across daily time slots.</span>
-        </div>
+        <p className="text-xs text-slate-400">No recurring pattern found in the recorded outcomes.</p>
       )}
 
       {/* Mandatory Non-Medical Disclaimer */}

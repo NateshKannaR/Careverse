@@ -1,3 +1,5 @@
+import type { ClientAdherenceInsight } from '../utils/adherenceInsights.js';
+
 const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('careverse_token');
   return {
@@ -222,9 +224,10 @@ export const api = {
       const q = patientId ? `?patientId=${patientId}` : '';
       return fetch(`/api/analytics/daily-score${q}`, { headers: getAuthHeaders() }).then<any>(handleResponse);
     },
-    getAdherencePatterns: (patientId?: string) => {
-      const q = patientId ? `?patient_id=${patientId}` : '';
-      return fetch(`/api/analytics/adherence-patterns${q}`, { headers: getAuthHeaders() }).then<any>(handleResponse);
+    getAdherencePatterns: (patientId?: string, signal?: AbortSignal) => {
+      const query = new URLSearchParams(patientId ? { patient_id: patientId } : {});
+      return fetch(`/api/analytics/adherence-patterns?${query}`, { headers: getAuthHeaders(), signal })
+        .then(handleResponse<{ insight: ClientAdherenceInsight }>);
     },
     getExportUrl: (patientId?: string) => `/api/analytics/export-csv${patientId ? `?patientId=${patientId}` : ''}`
   },
