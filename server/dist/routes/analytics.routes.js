@@ -3,7 +3,7 @@ import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { CareScoreService } from '../services/careScoreService.js';
-import { generateAdherenceInsight } from '../services/adherencePatternService.js';
+import { generateAdherenceInsight, generateAdherenceTrend } from '../services/adherencePatternService.js';
 const router = Router();
 router.use(authenticateJwt);
 const resolvePatientId = (req) => {
@@ -23,6 +23,10 @@ const resolvePatientId = (req) => {
     }
     return '';
 };
+function getPatientTimeZone(patientId) {
+    const patient = db.getPatientProfileById(patientId);
+    return (patient && db.getProfileById(patient.user_id)?.timezone) || 'UTC';
+}
 // GET /api/analytics/daily-score
 router.get('/daily-score', (req, res) => {
     const patientId = resolvePatientId(req);
@@ -47,7 +51,7 @@ router.get('/adherence-patterns', (req, res) => {
         return;
     const medications = db.getMedications(patientId, true);
     const records = db.getAdministrationRecords(patientId);
-    const insight = generateAdherenceInsight(medications, records);
+    const insight = generateAdherenceInsight(medications, records, new Date(), getPatientTimeZone(patientId));
     res.json({ insight });
 });
 // GET /api/analytics/adherence - 7, 14, or 30 days adherence trends based on real administration records
@@ -59,81 +63,14 @@ router.get('/adherence', (req, res) => {
     }
     if (!verifyPatientAccess(req, res, patientId, 'view'))
         return;
-    const days = parseInt(req.query.days || '7', 10);
-    const now = new Date();
-    const dayStats = [];
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    for (let i = days - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        const startIso = `${dateStr}T00:00:00.000Z`;
-        const endIso = `${dateStr}T23:59:59.999Z`;
-        const records = db.getAdministrationRecords(patientId, startIso, endIso);
-        const taken = records.filter(r => r.status === 'taken').length;
-        const missed = records.filter(r => r.status === 'missed').length;
-        const skipped = records.filter(r => r.status === 'skipped').length;
-        const scheduled = records.length;
-        // For today, calculate adherence only on doses that have become due so far
-        const isToday = i === 0;
-        let rate = 100;
-        if (isToday) {
-            const dueSoFar = taken + missed + skipped;
-            rate = dueSoFar > 0 ? Math.round((taken / dueSoFar) * 100) : 100;
-        }
-        else {
-            const pastDue = taken + missed + skipped;
-            rate = pastDue > 0 ? Math.round((taken / pastDue) * 100) : (scheduled > 0 ? 0 : 100);
-        }
-        dayStats.push({
-            date: dateStr,
-            dayName: dayNames[d.getDay()],
-            scheduled,
-            taken,
-            missed,
-            skipped,
-            adherenceRate: rate
-        });
+    const days = Number(req.query.days ?? 7);
+    if (!Number.isInteger(days) || days < 1 || days > 30) {
+        res.status(400).json({ error: 'Days must be an integer from 1 through 30.' });
+        return;
     }
-    // Calculate totals
-    const totalScheduled = dayStats.reduce((acc, curr) => acc + curr.scheduled, 0);
-    const totalTaken = dayStats.reduce((acc, curr) => acc + curr.taken, 0);
-    const totalMissed = dayStats.reduce((acc, curr) => acc + curr.missed, 0);
-    const totalDue = totalTaken + totalMissed;
-    const averageAdherence = totalDue > 0 ? Math.round((totalTaken / totalDue) * 100) : 100;
-    // Breakdown by category
     const medications = db.getMedications(patientId);
-    const categoryMap = {};
-    medications.forEach(m => {
-        if (!categoryMap[m.category]) {
-            categoryMap[m.category] = { total: 0, taken: 0 };
-        }
-    });
-    const allRecords = db.getAdministrationRecords(patientId);
-    allRecords.forEach(r => {
-        const med = medications.find(m => m.id === r.medication_id);
-        if (med && categoryMap[med.category]) {
-            categoryMap[med.category].total += 1;
-            if (r.status === 'taken') {
-                categoryMap[med.category].taken += 1;
-            }
-        }
-    });
-    const categoryAdherence = Object.keys(categoryMap).map(category => ({
-        category,
-        total: categoryMap[category].total,
-        taken: categoryMap[category].taken,
-        rate: categoryMap[category].total > 0 ? Math.round((categoryMap[category].taken / categoryMap[category].total) * 100) : 100
-    }));
-    res.json({
-        timeRangeDays: days,
-        averageAdherence,
-        totalScheduled,
-        totalTaken,
-        totalMissed,
-        dailyTrends: dayStats,
-        categoryBreakdown: categoryAdherence
-    });
+    const records = db.getAdministrationRecords(patientId);
+    res.json(generateAdherenceTrend(medications, records, days, new Date(), getPatientTimeZone(patientId)));
 });
 // GET /api/analytics/export-csv - downloads real healthcare administration report in CSV format
 router.get('/export-csv', (req, res) => {
