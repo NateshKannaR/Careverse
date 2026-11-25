@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
@@ -23,10 +24,6 @@ const resolvePatientId = (req) => {
     }
     return '';
 };
-function getPatientTimeZone(patientId) {
-    const patient = db.getPatientProfileById(patientId);
-    return (patient && db.getProfileById(patient.user_id)?.timezone) || 'UTC';
-}
 // GET /api/analytics/daily-score
 router.get('/daily-score', (req, res) => {
     const patientId = resolvePatientId(req);
@@ -36,8 +33,12 @@ router.get('/daily-score', (req, res) => {
     }
     if (!verifyPatientAccess(req, res, patientId, 'view'))
         return;
-    const dateStr = req.query.date;
-    const score = CareScoreService.calculateDailyCareScore(patientId, dateStr);
+    const date = z.string().date().optional().safeParse(req.query.date);
+    if (!date.success) {
+        res.status(400).json({ error: 'Date must be a valid YYYY-MM-DD value.' });
+        return;
+    }
+    const score = CareScoreService.calculateDailyCareScore(patientId, date.data);
     res.json({ score });
 });
 // GET /api/analytics/adherence-patterns - slot-based habitual pattern detection & lifestyle advice
@@ -51,7 +52,7 @@ router.get('/adherence-patterns', (req, res) => {
         return;
     const medications = db.getMedications(patientId, true);
     const records = db.getAdministrationRecords(patientId);
-    const insight = generateAdherenceInsight(medications, records, new Date(), getPatientTimeZone(patientId));
+    const insight = generateAdherenceInsight(medications, records, new Date(), db.getPatientTimeZone(patientId));
     res.json({ insight });
 });
 // GET /api/analytics/adherence - 7, 14, or 30 days adherence trends based on real administration records
@@ -70,8 +71,12 @@ router.get('/adherence', (req, res) => {
     }
     const medications = db.getMedications(patientId);
     const records = db.getAdministrationRecords(patientId);
-    res.json(generateAdherenceTrend(medications, records, days, new Date(), getPatientTimeZone(patientId)));
+    res.json(generateAdherenceTrend(medications, records, days, new Date(), db.getPatientTimeZone(patientId)));
 });
+function csvCell(value = '') {
+    const text = /^[\s]*[=+@-]/.test(value) || /^[\t\r\n]/.test(value) ? "'" + value : value;
+    return '"' + text.replace(/"/g, '""') + '"';
+}
 // GET /api/analytics/export-csv - downloads real healthcare administration report in CSV format
 router.get('/export-csv', (req, res) => {
     const patientId = resolvePatientId(req);
@@ -84,26 +89,19 @@ router.get('/export-csv', (req, res) => {
     const patient = db.getPatientProfileById(patientId);
     const user = patient ? db.getProfileById(patient.user_id) : undefined;
     const records = db.getAdministrationRecords(patientId);
-    const csvRows = [];
-    csvRows.push('Record ID,Patient Name,Medication,Category,Dosage,Scheduled Time,Actual Time,Status,Recorded By,Notes');
-    records.forEach(r => {
-        const med = r.medication;
-        const recordedBy = r.recorded_by_user ? r.recorded_by_user.full_name : 'Patient';
-        csvRows.push([
-            `"${r.id}"`,
-            `"${user?.full_name || 'Patient'}"`,
-            `"${med?.name || 'Medication'}"`,
-            `"${med?.category || ''}"`,
-            `"${med?.dosage || ''}"`,
-            `"${r.scheduled_time}"`,
-            `"${r.actual_time || 'N/A'}"`,
-            `"${r.status}"`,
-            `"${recordedBy}"`,
-            `"${(r.notes || '').replace(/"/g, '""')}"`
-        ].join(','));
-    });
+    const csvRows = ['Record ID,Patient Name,Medication,Category,Dosage,Scheduled Time,Actual Time,Status,Recorded By,Notes'];
+    for (const record of records) {
+        const med = record.medication;
+        const cells = [
+            record.id, user?.full_name || 'Patient', med?.name || 'Medication', med?.category,
+            med?.dosage, record.scheduled_time, record.actual_time, record.status,
+            record.recorded_by_user?.full_name, record.notes,
+        ];
+        csvRows.push(cells.map(csvCell).join(','));
+    }
     const csvContent = csvRows.join('\n');
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Content-Disposition', `attachment; filename="careverse-report-${patientId.substring(0, 8)}.csv"`);
     res.status(200).send(csvContent);
 });

@@ -66107,6 +66107,28 @@ var StorageAdapter = class {
         created_at: (/* @__PURE__ */ new Date()).toISOString()
       }
     ];
+    const demoHistory = [
+      ["taken", "missed"],
+      ["taken", "taken"],
+      ["skipped", "taken"],
+      ["taken", "due_now"],
+      ["taken", "taken"],
+      ["missed", "taken"]
+    ];
+    demoHistory.forEach((statuses, offset) => {
+      const date = new Date(Date.parse(`${today}T00:00:00Z`) - (offset + 1) * 864e5).toISOString().slice(0, 10);
+      statuses.forEach((status, index) => {
+        const scheduled = `${date}T${index === 0 ? "13" : "20"}:00:00Z`;
+        this.store.administrationRecords.push({
+          id: `demo-history-${date}-${index}`,
+          patient_id: patientProfile.id,
+          medication_id: index === 0 ? med1.id : med2.id,
+          scheduled_time: scheduled,
+          status,
+          ...status === "taken" ? { actual_time: scheduled, recorded_by: eleanor.id } : {}
+        });
+      });
+    });
     const apptDate1 = new Date(Date.now() + 3 * 864e5).toISOString().split("T")[0];
     const apptDate2 = new Date(Date.now() + 14 * 864e5).toISOString().split("T")[0];
     this.store.appointments = [
@@ -66532,10 +66554,13 @@ var StorageAdapter = class {
     return true;
   }
   // --- Wellbeing Check-ins ---
-  getWellbeingCheckinToday(patientId) {
-    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  getPatientTimeZone(patientId) {
+    const patient = this.getPatientProfileById(patientId);
+    return patient && this.getProfileById(patient.user_id)?.timezone || "UTC";
+  }
+  getWellbeingCheckinForDate(patientId, date) {
     return this.store.wellbeingCheckins.find(
-      (w3) => w3.patient_id === patientId && w3.checkin_date === today
+      (checkin) => checkin.patient_id === patientId && checkin.checkin_date === date
     );
   }
   getWellbeingCheckins(patientId, limit = 30) {
@@ -68392,6 +68417,211 @@ function predictAllRefills(medications, now = /* @__PURE__ */ new Date()) {
   return medications.filter((m2) => m2.is_active).map((med) => predictMedicationRefill(med, void 0, now)).sort((a, b3) => a.days_remaining - b3.days_remaining);
 }
 
+// src/services/adherencePatternService.ts
+var MEDICAL_DISCLAIMER = "Adherence insights reflect recorded dose outcomes. Always consult your healthcare provider before changing your medication schedule.";
+var DAY_MS = 24 * 60 * 60 * 1e3;
+var SLOTS = [
+  { name: "morning", timeWindow: "05:00\u201311:00", endHour: 11 },
+  { name: "afternoon", timeWindow: "11:00\u201316:00", endHour: 16 },
+  { name: "evening", timeWindow: "16:00\u201321:00", endHour: 21 },
+  { name: "bedtime", timeWindow: "21:00\u201305:00", endHour: 29 }
+];
+var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function makeCalendar(timeZone) {
+  const options = {
+    calendar: "iso8601",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23"
+  };
+  let formatter;
+  try {
+    formatter = new Intl.DateTimeFormat("en-GB", { ...options, timeZone });
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    formatter = new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" });
+  }
+  return {
+    timeZone: formatter.resolvedOptions().timeZone,
+    read(date) {
+      const parts = formatter.formatToParts(date);
+      const read = (type) => Number(parts.find((part) => part.type === type)?.value);
+      const day = Date.UTC(read("year"), read("month") - 1, read("day")) / DAY_MS;
+      return { day, hour: read("hour") };
+    }
+  };
+}
+function collectEvents(records, now, timeZone) {
+  const calendar = makeCalendar(timeZone);
+  const today = calendar.read(now).day;
+  const events = [];
+  for (const record of records) {
+    const timestamp = Date.parse(record.scheduled_time);
+    if (!Number.isFinite(timestamp)) continue;
+    const { day, hour } = calendar.read(new Date(timestamp));
+    if (day > today) continue;
+    events.push({
+      record,
+      day,
+      hour,
+      due: timestamp <= now.getTime()
+    });
+  }
+  return { events, today, timeZone: calendar.timeZone };
+}
+function summarizeDoses(events) {
+  let taken = 0;
+  let missed = 0;
+  let skipped = 0;
+  let pending = 0;
+  for (const event of events) {
+    if (!event.due) continue;
+    switch (event.record.status) {
+      case "taken":
+        taken += 1;
+        break;
+      case "missed":
+        missed += 1;
+        break;
+      case "skipped":
+        skipped += 1;
+        break;
+      default:
+        pending += 1;
+    }
+  }
+  const recorded = taken + missed + skipped;
+  const rate = recorded > 0 ? Math.round(taken / recorded * 100) : null;
+  return { scheduled: recorded + pending, recorded, taken, missed, skipped, pending, rate };
+}
+function getPatientDate(now, timeZone) {
+  return new Date(makeCalendar(timeZone).read(now).day * DAY_MS).toISOString().slice(0, 10);
+}
+function getDailyDoseEvidence(records, now, timeZone, date) {
+  const history = collectEvents(records, now, timeZone);
+  const selectedDay = date ? Date.parse(`${date}T00:00:00.000Z`) / DAY_MS : history.today;
+  const events = history.events.filter((event) => event.day === selectedDay);
+  const summary = summarizeDoses(events);
+  return {
+    date: date ?? new Date(history.today * DAY_MS).toISOString().slice(0, 10),
+    timeZone: history.timeZone,
+    records: events.map((event) => event.record),
+    due: summary.scheduled,
+    taken: summary.taken,
+    missed: summary.missed,
+    skipped: summary.skipped,
+    pending: summary.pending,
+    upcoming: events.length - summary.scheduled,
+    recorded: summary.recorded,
+    rate: summary.rate
+  };
+}
+function getPatterns(medications, events, today) {
+  const activeIds = new Set(medications.filter((medication) => medication.is_active).map((medication) => medication.id));
+  const slotEvents = SLOTS.map(() => []);
+  for (const event of events) {
+    if (!event.due || event.day < today - 13 || !activeIds.has(event.record.medication_id)) continue;
+    const hour = event.hour < 5 ? event.hour + 24 : event.hour;
+    const index = SLOTS.findIndex((slot) => hour < slot.endHour);
+    slotEvents[index].push(event);
+  }
+  return SLOTS.flatMap((slot, index) => {
+    const { recorded, missed, skipped } = summarizeDoses(slotEvents[index]);
+    if (recorded < 3) return [];
+    const incomplete = missed + skipped;
+    if (incomplete < 2 && incomplete * 4 < recorded) return [];
+    const label = slot.name[0].toUpperCase() + slot.name.slice(1);
+    return [{
+      slot_name: slot.name,
+      time_window: slot.timeWindow,
+      total_scheduled: recorded,
+      missed_count: incomplete,
+      missed_percentage: Math.round(incomplete / recorded * 100),
+      suggestion: `${label} doses have been missed or skipped in recent records. Consider setting a reminder for the prescribed time.`
+    }];
+  });
+}
+function getStreak(events, today) {
+  let streak = 0;
+  for (let offset = 0; offset < 30; offset += 1) {
+    const dayEvents = events.filter((event) => event.day === today - offset);
+    if (dayEvents.length > 0 && dayEvents.every((event) => event.due && event.record.status === "taken")) {
+      streak += 1;
+      continue;
+    }
+    if (offset === 0 && !dayEvents.some((event) => event.due && (event.record.status === "missed" || event.record.status === "skipped"))) {
+      continue;
+    }
+    break;
+  }
+  return streak;
+}
+function generateAdherenceInsight(medications, records, now = /* @__PURE__ */ new Date(), timeZone = "UTC") {
+  const history = collectEvents(records, now, timeZone);
+  const monthEvents = history.events.filter((event) => event.day >= history.today - 29);
+  const month = summarizeDoses(monthEvents);
+  const week = summarizeDoses(monthEvents.filter((event) => event.day >= history.today - 6));
+  return {
+    has_data: month.scheduled > 0,
+    weekly_adherence_rate: week.rate,
+    monthly_adherence_rate: month.rate,
+    streak_days: getStreak(monthEvents, history.today),
+    total_scheduled_week: week.scheduled,
+    total_taken_week: week.taken,
+    total_missed_week: week.missed + week.skipped,
+    total_pending_week: week.pending,
+    time_zone: history.timeZone,
+    patterns: getPatterns(medications, monthEvents, history.today),
+    disclaimer: MEDICAL_DISCLAIMER
+  };
+}
+function generateAdherenceTrend(medications, records, days, now = /* @__PURE__ */ new Date(), timeZone = "UTC") {
+  const history = collectEvents(records, now, timeZone);
+  const startDay = history.today - days + 1;
+  const events = history.events.filter((event) => event.day >= startDay);
+  const totals = summarizeDoses(events);
+  const categoryByMedication = new Map(medications.map((medication) => [medication.id, medication.category]));
+  const categoryEvents = /* @__PURE__ */ new Map();
+  for (const event of events) {
+    if (!event.due) continue;
+    const category = categoryByMedication.get(event.record.medication_id) ?? "Other";
+    const group = categoryEvents.get(category);
+    if (group) group.push(event);
+    else categoryEvents.set(category, [event]);
+  }
+  return {
+    timeRangeDays: days,
+    timeZone: history.timeZone,
+    averageAdherence: totals.rate,
+    totalScheduled: totals.scheduled,
+    totalTaken: totals.taken,
+    totalMissed: totals.missed,
+    totalSkipped: totals.skipped,
+    totalPending: totals.pending,
+    dailyTrends: Array.from({ length: days }, (_2, offset) => {
+      const day = startDay + offset;
+      const date = new Date(day * DAY_MS);
+      const { scheduled, taken, missed, skipped, pending, rate } = summarizeDoses(events.filter((event) => event.day === day));
+      return {
+        date: date.toISOString().slice(0, 10),
+        dayName: DAY_NAMES[date.getUTCDay()],
+        scheduled,
+        taken,
+        missed,
+        skipped,
+        pending,
+        adherenceRate: rate
+      };
+    }),
+    categoryBreakdown: Array.from(categoryEvents, ([category, group]) => {
+      const { scheduled, taken, rate } = summarizeDoses(group);
+      return { category, total: scheduled, taken, rate };
+    })
+  };
+}
+
 // src/routes/medications.routes.ts
 var router3 = (0, import_express3.Router)();
 router3.use(authenticateJwt);
@@ -68514,21 +68744,24 @@ router3.get("/doses/today", (req, res) => {
     return;
   }
   if (!verifyPatientAccess(req, res, patientId, "view")) return;
-  const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-  const startIso = `${todayStr}T00:00:00.000Z`;
-  const endIso = `${todayStr}T23:59:59.999Z`;
-  const records = db.getAdministrationRecords(patientId, startIso, endIso);
-  records.sort((a, b3) => new Date(a.scheduled_time).getTime() - new Date(b3.scheduled_time).getTime());
+  const now = /* @__PURE__ */ new Date();
+  const evidence = getDailyDoseEvidence(db.getAdministrationRecords(patientId), now, db.getPatientTimeZone(patientId));
+  const records = evidence.records.sort((a, b3) => Date.parse(a.scheduled_time) - Date.parse(b3.scheduled_time)).map((record) => {
+    if (record.status !== "upcoming" && record.status !== "due_now") return record;
+    return { ...record, status: Date.parse(record.scheduled_time) <= now.getTime() ? "due_now" : "upcoming" };
+  });
   res.json({
-    date: todayStr,
+    date: evidence.date,
+    time_zone: evidence.timeZone,
     records,
     summary: {
       total: records.length,
-      taken: records.filter((r2) => r2.status === "taken").length,
-      upcoming: records.filter((r2) => r2.status === "upcoming").length,
-      due_now: records.filter((r2) => r2.status === "due_now").length,
-      missed: records.filter((r2) => r2.status === "missed").length,
-      skipped: records.filter((r2) => r2.status === "skipped").length
+      due: evidence.due,
+      taken: evidence.taken,
+      upcoming: evidence.upcoming,
+      due_now: evidence.pending,
+      missed: evidence.missed,
+      skipped: evidence.skipped
     }
   });
 });
@@ -69440,7 +69673,7 @@ router6.get("/today", (req, res) => {
     return;
   }
   if (!verifyPatientAccess(req, res, patientId, "view")) return;
-  const checkin = db.getWellbeingCheckinToday(patientId);
+  const checkin = db.getWellbeingCheckinForDate(patientId, getPatientDate(/* @__PURE__ */ new Date(), db.getPatientTimeZone(patientId)));
   res.json({ checkin: checkin || null });
 });
 router6.get("/history", (req, res) => {
@@ -69466,7 +69699,7 @@ router6.post("/", (req, res) => {
     return;
   }
   if (!verifyPatientAccess(req, res, patientId, "view")) return;
-  const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const todayStr = getPatientDate(/* @__PURE__ */ new Date(), db.getPatientTimeZone(patientId));
   const checkin = {
     id: v4_default(),
     patient_id: patientId,
@@ -69660,58 +69893,36 @@ var import_express9 = __toESM(require_express2(), 1);
 
 // src/services/careScoreService.ts
 var CareScoreService = class {
-  /**
-   * Computes transparent routine completion score based on actual recorded events.
-   * NOTE: Strictly labeled as a routine completion indicator, NOT a medical clinical diagnosis.
-   */
-  static calculateDailyCareScore(patientId, dateStr) {
-    const targetDate = dateStr || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const startIso = `${targetDate}T00:00:00.000Z`;
-    const endIso = `${targetDate}T23:59:59.999Z`;
-    const records = db.getAdministrationRecords(patientId, startIso, endIso);
-    const checkin = db.getWellbeingCheckins(patientId).find((c2) => c2.checkin_date === targetDate);
-    const appointments = db.getAppointments(patientId).filter((a) => a.appointment_date === targetDate);
-    const scheduledDoses = records.length;
-    const completedDoses = records.filter((r2) => r2.status === "taken").length;
-    const missedDoses = records.filter((r2) => r2.status === "missed").length;
-    const pendingDoses = records.filter((r2) => r2.status === "upcoming" || r2.status === "due_now").length;
-    const dosesDueSoFar = completedDoses + missedDoses;
-    let doseScore = 0;
-    let doseAdherencePercentage = 100;
-    if (dosesDueSoFar > 0) {
-      doseAdherencePercentage = Math.round(completedDoses / dosesDueSoFar * 100);
-      doseScore = completedDoses / dosesDueSoFar * 70;
-    } else if (scheduledDoses > 0) {
-      doseAdherencePercentage = 100;
-      doseScore = 70;
-    } else {
-      doseScore = 70;
-      doseAdherencePercentage = 100;
-    }
-    const wellbeingScore = checkin ? 30 : 0;
-    const totalScore = Math.min(100, Math.round(doseScore + wellbeingScore));
+  static calculateDailyCareScore(patientId, date, now = /* @__PURE__ */ new Date()) {
+    const evidence = getDailyDoseEvidence(db.getAdministrationRecords(patientId), now, db.getPatientTimeZone(patientId), date);
+    const checkin = db.getWellbeingCheckinForDate(patientId, evidence.date);
+    const appointments = db.getAppointments(patientId).filter((a) => a.appointment_date === evidence.date && a.status === "scheduled");
+    const completedItems = evidence.taken + Number(Boolean(checkin));
+    const routineItems = evidence.due + 1;
+    const score = evidence.recorded > 0 || checkin ? Math.round(completedItems / routineItems * 100) : null;
     let rating = "In Progress";
-    if (missedDoses > 0) {
-      rating = "Needs Attention";
-    } else if (totalScore >= 90) {
-      rating = "Excellent";
-    } else if (totalScore >= 70) {
-      rating = "Good";
-    } else if (pendingDoses === 0 && totalScore < 70) {
-      rating = "Needs Attention";
-    }
+    if (evidence.missed + evidence.skipped > 0) rating = "Needs Attention";
+    else if (evidence.pending === 0 && score === 100) rating = "Excellent";
+    else if (evidence.pending === 0 && score !== null && score >= 70) rating = "Good";
     return {
-      date: targetDate,
-      score: totalScore,
+      date: evidence.date,
+      timeZone: evidence.timeZone,
+      score,
       rating,
       disclaimer: "The Daily Care Score is a routine completion indicator based on recorded care activities. It is not a clinical health diagnostic evaluation.",
       metrics: {
-        scheduledDoses,
-        completedDoses,
-        pendingDoses,
-        missedDoses,
-        doseAdherencePercentage,
-        wellbeingCheckinRecorded: !!checkin,
+        scheduledDoses: evidence.records.length,
+        completedDoses: evidence.taken,
+        pendingDoses: evidence.pending,
+        missedDoses: evidence.missed,
+        skippedDoses: evidence.skipped,
+        dueDoses: evidence.due,
+        upcomingDoses: evidence.upcoming,
+        recordedDoses: evidence.recorded,
+        completedItems,
+        routineItems,
+        doseAdherencePercentage: evidence.rate,
+        wellbeingCheckinRecorded: Boolean(checkin),
         upcomingAppointmentsCount: appointments.length
       }
     };
@@ -69719,7 +69930,22 @@ var CareScoreService = class {
 };
 
 // src/services/careBuddyService.ts
-var MEDICAL_DISCLAIMER = "IMPORTANT MEDICAL DISCLAIMER: CareBuddy is an AI routine support assistant and does NOT provide medical advice, diagnosis, dosage adjustments, or emergency triage. Always consult your doctor, pharmacist, or dial emergency services (911 / 112) for clinical concerns.";
+var MEDICAL_DISCLAIMER2 = "IMPORTANT MEDICAL DISCLAIMER: CareBuddy is an AI routine support assistant and does NOT provide medical advice, diagnosis, dosage adjustments, or emergency triage. Always consult your doctor, pharmacist, or dial emergency services (911 / 112) for clinical concerns.";
+function doseSummary(metrics) {
+  return `${metrics.completedDoses} taken, ${metrics.missedDoses} missed, ${metrics.skippedDoses} skipped, ${metrics.pendingDoses} awaiting a record, ${metrics.upcomingDoses} upcoming`;
+}
+function scoreSummary(careScore) {
+  return careScore.score === null ? "No activity recorded yet" : `${careScore.score}% (${careScore.metrics.completedItems} of ${careScore.metrics.routineItems} routine items completed)`;
+}
+function upcomingAppointments(patientId, score, now) {
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: score.timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(now);
+  return db.getAppointments(patientId).filter((appointment) => appointment.status === "scheduled" && (appointment.appointment_date > score.date || appointment.appointment_date === score.date && appointment.appointment_time >= time)).sort((a, b3) => `${a.appointment_date}T${a.appointment_time}`.localeCompare(`${b3.appointment_date}T${b3.appointment_time}`));
+}
 var CareBuddyService = class {
   /**
    * Generates intelligent, contextual response using the patient's authenticated medical records.
@@ -69729,10 +69955,10 @@ var CareBuddyService = class {
     const patientUser = patient ? db.getProfileById(patient.user_id) : void 0;
     const patientName = patientUser?.full_name || "Patient";
     const meds = db.getMedications(patientId, true);
-    const appointments = db.getAppointments(patientId).filter((a) => a.status === "scheduled");
-    const careScore = CareScoreService.calculateDailyCareScore(patientId);
-    const checkin = db.getWellbeingCheckinToday(patientId);
-    const notes = db.getCareNotes(patientId);
+    const now = /* @__PURE__ */ new Date();
+    const careScore = CareScoreService.calculateDailyCareScore(patientId, void 0, now);
+    const appointments = upcomingAppointments(patientId, careScore, now);
+    const checkin = db.getWellbeingCheckinForDate(patientId, careScore.date);
     const contextUsed = {
       patientName,
       activeMedsCount: meds.length,
@@ -69741,15 +69967,22 @@ var CareBuddyService = class {
       upcomingAppointmentsCount: appointments.length
     };
     const query = userMessage.toLowerCase().trim();
+    if (/\b(?:double|forgot|make up)\b|\b(?:can|could|should)\s+i\b[^?]*\b(?:take|skip|repeat)\b|\bi\s+missed\b/.test(query)) {
+      return {
+        reply: "Contact your prescribing clinic or local pharmacist for instructions specific to the medication. They can tell you whether a late dose is appropriate. Share the medication name, scheduled time, and what you have already taken.",
+        suggestedFollowUps: ["Show my medication schedule", "Summarize my day"],
+        contextUsed,
+        disclaimer: MEDICAL_DISCLAIMER2,
+        source: "contextual-assistant"
+      };
+    }
     if (query.includes("summar") || query.includes("today") || query.includes("how am i doing") || query.includes("routine") || query.includes("progress")) {
       const summaryText = [
         `Good day, ${patientName}! Here is your current daily care overview:`,
-        `- **Medications:** You have taken **${careScore.metrics.completedDoses} of ${careScore.metrics.scheduledDoses}** scheduled doses today.`,
-        careScore.metrics.pendingDoses > 0 ? `- **Pending Doses:** You have **${careScore.metrics.pendingDoses}** doses remaining for today.` : `- **Pending Doses:** All scheduled doses for today have been completed! Outstanding job.`,
-        careScore.metrics.missedDoses > 0 ? `- **Missed Doses:** There are ${careScore.metrics.missedDoses} unrecorded doses from earlier today.` : "",
+        `- **Medications:** ${doseSummary(careScore.metrics)}.`,
         checkin ? `- **Wellbeing Check-in:** Recorded (Mood: *${checkin.mood}*, Energy: *${checkin.energy_level}/5*).` : `- **Wellbeing Check-in:** You have not recorded your daily check-in yet. Would you like to do that now?`,
-        appointments.length > 0 ? `- **Next Appointment:** With **${appointments[0].doctor_name}** (${appointments[0].specialty}) on **${appointments[0].appointment_date} at ${appointments[0].appointment_time}**.` : `- **Appointments:** No medical visits scheduled for this week.`,
-        `- **Daily Routine Care Score:** **${careScore.score}%** (${careScore.rating}).`
+        appointments.length > 0 ? `- **Next Appointment:** With **${appointments[0].doctor_name}** (${appointments[0].specialty}) on **${appointments[0].appointment_date} at ${appointments[0].appointment_time}**.` : `- **Appointments:** No upcoming appointments are recorded.`,
+        `- **Daily Routine Care Score:** ${scoreSummary(careScore)}.`
       ].filter(Boolean).join("\n");
       return {
         reply: summaryText,
@@ -69759,23 +69992,7 @@ var CareBuddyService = class {
           "Explain my medications"
         ],
         contextUsed,
-        disclaimer: MEDICAL_DISCLAIMER,
-        source: "contextual-assistant"
-      };
-    }
-    if (query.includes("miss") || query.includes("double") || query.includes("forgot")) {
-      const reply = [
-        `**Safety Protocol for Missed Doses:**`,
-        `\u2022 **NEVER take a double dose** to compensate for a missed dose. Doing so can cause sudden side effects or toxicity.`,
-        `\u2022 If only a short time has passed, follow your clinician's or pharmacist's specific guidelines on whether to take it or skip.`,
-        `\u2022 If it is almost time for your next scheduled dose, skip the missed dose and resume your regular schedule.`,
-        `\u2022 When in doubt, contact your prescribing clinic or local pharmacist directly for guidance.`
-      ].join("\n");
-      return {
-        reply,
-        suggestedFollowUps: ["Show my medication schedule", "Summarize my day"],
-        contextUsed,
-        disclaimer: MEDICAL_DISCLAIMER,
+        disclaimer: MEDICAL_DISCLAIMER2,
         source: "contextual-assistant"
       };
     }
@@ -69785,9 +70002,7 @@ var CareBuddyService = class {
         `Here are the active medications prescribed for ${patientName}:`,
         medList || "No active medications currently recorded.",
         `
-**Today's Status:** ${careScore.metrics.completedDoses} taken, ${careScore.metrics.pendingDoses} upcoming, ${careScore.metrics.missedDoses} missed.`,
-        `
-*Refill Notice:* If your medication supply reaches 5 doses or fewer, CAREVERSE will automatically notify your Care Circle.`
+**Today's status:** ${doseSummary(careScore.metrics)}.`
       ].join("\n");
       return {
         reply,
@@ -69797,7 +70012,7 @@ var CareBuddyService = class {
           "What happens if I miss a dose?"
         ],
         contextUsed,
-        disclaimer: MEDICAL_DISCLAIMER,
+        disclaimer: MEDICAL_DISCLAIMER2,
         source: "contextual-assistant"
       };
     }
@@ -69807,7 +70022,7 @@ var CareBuddyService = class {
           reply: `You currently have no upcoming appointments scheduled in CAREVERSE. If you schedule a visit, I can help you prepare questions for your doctor!`,
           suggestedFollowUps: ["Summarize my routine", "View active medications"],
           contextUsed,
-          disclaimer: MEDICAL_DISCLAIMER,
+          disclaimer: MEDICAL_DISCLAIMER2,
           source: "contextual-assistant"
         };
       }
@@ -69831,7 +70046,7 @@ var CareBuddyService = class {
           "How is my daily care score calculated?"
         ],
         contextUsed,
-        disclaimer: MEDICAL_DISCLAIMER,
+        disclaimer: MEDICAL_DISCLAIMER2,
         source: "contextual-assistant"
       };
     }
@@ -69856,13 +70071,13 @@ var CareBuddyService = class {
           "Summarize my routine"
         ],
         contextUsed,
-        disclaimer: MEDICAL_DISCLAIMER,
+        disclaimer: MEDICAL_DISCLAIMER2,
         source: "contextual-assistant"
       };
     }
     const defaultReply = [
       `Hello ${patientName}! I am **CareBuddy**, your personal healthcare assistant in CAREVERSE.`,
-      `I can help you review your **daily medication schedule**, prepare for your **upcoming appointment with ${appointments[0]?.doctor_name || "your clinician"}**, check your **Daily Care Score (${careScore.score}%)**, and explain medical terms in plain English.`,
+      `I can help you review your **daily medication schedule**, prepare for your **upcoming appointment with ${appointments[0]?.doctor_name || "your clinician"}**, check your **daily routine progress**, and explain medical terms in plain English.`,
       `
 How can I help you right now?`
     ].join("\n");
@@ -69875,7 +70090,7 @@ How can I help you right now?`
         "What is my Daily Care Score?"
       ],
       contextUsed,
-      disclaimer: MEDICAL_DISCLAIMER,
+      disclaimer: MEDICAL_DISCLAIMER2,
       source: "contextual-assistant"
     };
   }
@@ -69886,15 +70101,16 @@ How can I help you right now?`
     const patient = db.getPatientProfileById(patientId);
     const user = patient ? db.getProfileById(patient.user_id) : void 0;
     const name2 = user?.full_name || "Your loved one";
-    const score = CareScoreService.calculateDailyCareScore(patientId);
-    const checkin = db.getWellbeingCheckinToday(patientId);
-    const appts = db.getAppointments(patientId).filter((a) => a.status === "scheduled");
+    const now = /* @__PURE__ */ new Date();
+    const score = CareScoreService.calculateDailyCareScore(patientId, void 0, now);
+    const checkin = db.getWellbeingCheckinForDate(patientId, score.date);
+    const appts = upcomingAppointments(patientId, score, now);
     return [
       `CAREVERSE Family Daily Digest for ${name2} (${score.date}):`,
-      `\u2022 Routine Completion: ${score.score}% (${score.rating})`,
-      `\u2022 Medication Doses: ${score.metrics.completedDoses} completed, ${score.metrics.pendingDoses} upcoming, ${score.metrics.missedDoses} missed`,
+      `\u2022 Routine Completion: ${scoreSummary(score)}`,
+      `\u2022 Medication Doses: ${doseSummary(score.metrics)}`,
       checkin ? `\u2022 Wellbeing: Feeling ${checkin.mood} (Energy: ${checkin.energy_level}/5, Pain: ${checkin.pain_level}/10)` : `\u2022 Wellbeing: Check-in pending`,
-      appts.length > 0 ? `\u2022 Next Appointment: ${appts[0].doctor_name} (${appts[0].specialty}) on ${appts[0].appointment_date}` : `\u2022 No appointments today.`
+      appts.length > 0 ? `\u2022 Next Appointment: ${appts[0].doctor_name} (${appts[0].specialty}) on ${appts[0].appointment_date}` : `\u2022 No upcoming appointments are recorded.`
     ].join("\n");
   }
 };
@@ -69961,192 +70177,6 @@ var careBuddy_routes_default = router9;
 
 // src/routes/analytics.routes.ts
 var import_express10 = __toESM(require_express2(), 1);
-
-// src/services/adherencePatternService.ts
-var MEDICAL_DISCLAIMER2 = "Adherence insights reflect recorded dose outcomes. Always consult your healthcare provider before changing your medication schedule.";
-var DAY_MS = 24 * 60 * 60 * 1e3;
-var SLOTS = [
-  { name: "morning", timeWindow: "05:00\u201311:00", endHour: 11 },
-  { name: "afternoon", timeWindow: "11:00\u201316:00", endHour: 16 },
-  { name: "evening", timeWindow: "16:00\u201321:00", endHour: 21 },
-  { name: "bedtime", timeWindow: "21:00\u201305:00", endHour: 29 }
-];
-var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-function makeCalendar(timeZone) {
-  const options = {
-    calendar: "iso8601",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23"
-  };
-  let formatter;
-  try {
-    formatter = new Intl.DateTimeFormat("en-GB", { ...options, timeZone });
-  } catch (error) {
-    if (!(error instanceof RangeError)) throw error;
-    formatter = new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" });
-  }
-  return {
-    timeZone: formatter.resolvedOptions().timeZone,
-    read(date) {
-      const parts = formatter.formatToParts(date);
-      const read = (type) => Number(parts.find((part) => part.type === type)?.value);
-      const day = Date.UTC(read("year"), read("month") - 1, read("day")) / DAY_MS;
-      return { day, hour: read("hour") };
-    }
-  };
-}
-function collectEvents(records, now, timeZone) {
-  const calendar = makeCalendar(timeZone);
-  const today = calendar.read(now).day;
-  const events = [];
-  for (const record of records) {
-    const timestamp = Date.parse(record.scheduled_time);
-    if (!Number.isFinite(timestamp)) continue;
-    const { day, hour } = calendar.read(new Date(timestamp));
-    if (day > today) continue;
-    events.push({
-      medicationId: record.medication_id,
-      day,
-      hour,
-      due: timestamp <= now.getTime(),
-      status: record.status
-    });
-  }
-  return { events, today, timeZone: calendar.timeZone };
-}
-function summarizeDoses(events) {
-  let taken = 0;
-  let missed = 0;
-  let skipped = 0;
-  let pending = 0;
-  for (const event of events) {
-    if (!event.due) continue;
-    switch (event.status) {
-      case "taken":
-        taken += 1;
-        break;
-      case "missed":
-        missed += 1;
-        break;
-      case "skipped":
-        skipped += 1;
-        break;
-      default:
-        pending += 1;
-    }
-  }
-  const recorded = taken + missed + skipped;
-  const rate = recorded > 0 ? Math.round(taken / recorded * 100) : null;
-  return { scheduled: recorded + pending, recorded, taken, missed, skipped, pending, rate };
-}
-function getPatterns(medications, events, today) {
-  const activeIds = new Set(medications.filter((medication) => medication.is_active).map((medication) => medication.id));
-  const slotEvents = SLOTS.map(() => []);
-  for (const event of events) {
-    if (!event.due || event.day < today - 13 || !activeIds.has(event.medicationId)) continue;
-    const hour = event.hour < 5 ? event.hour + 24 : event.hour;
-    const index = SLOTS.findIndex((slot) => hour < slot.endHour);
-    slotEvents[index].push(event);
-  }
-  return SLOTS.flatMap((slot, index) => {
-    const { recorded, missed, skipped } = summarizeDoses(slotEvents[index]);
-    if (recorded < 3) return [];
-    const incomplete = missed + skipped;
-    if (incomplete < 2 && incomplete * 4 < recorded) return [];
-    const label = slot.name[0].toUpperCase() + slot.name.slice(1);
-    return [{
-      slot_name: slot.name,
-      time_window: slot.timeWindow,
-      total_scheduled: recorded,
-      missed_count: incomplete,
-      missed_percentage: Math.round(incomplete / recorded * 100),
-      suggestion: `${label} doses have been missed or skipped in recent records. Consider setting a reminder for the prescribed time.`
-    }];
-  });
-}
-function getStreak(events, today) {
-  let streak = 0;
-  for (let offset = 0; offset < 30; offset += 1) {
-    const dayEvents = events.filter((event) => event.day === today - offset);
-    if (dayEvents.length > 0 && dayEvents.every((event) => event.due && event.status === "taken")) {
-      streak += 1;
-      continue;
-    }
-    if (offset === 0 && !dayEvents.some((event) => event.due && (event.status === "missed" || event.status === "skipped"))) {
-      continue;
-    }
-    break;
-  }
-  return streak;
-}
-function generateAdherenceInsight(medications, records, now = /* @__PURE__ */ new Date(), timeZone = "UTC") {
-  const history = collectEvents(records, now, timeZone);
-  const monthEvents = history.events.filter((event) => event.day >= history.today - 29);
-  const month = summarizeDoses(monthEvents);
-  const week = summarizeDoses(monthEvents.filter((event) => event.day >= history.today - 6));
-  return {
-    has_data: month.scheduled > 0,
-    weekly_adherence_rate: week.rate,
-    monthly_adherence_rate: month.rate,
-    streak_days: getStreak(monthEvents, history.today),
-    total_scheduled_week: week.scheduled,
-    total_taken_week: week.taken,
-    total_missed_week: week.missed + week.skipped,
-    total_pending_week: week.pending,
-    time_zone: history.timeZone,
-    patterns: getPatterns(medications, monthEvents, history.today),
-    disclaimer: MEDICAL_DISCLAIMER2
-  };
-}
-function generateAdherenceTrend(medications, records, days, now = /* @__PURE__ */ new Date(), timeZone = "UTC") {
-  const history = collectEvents(records, now, timeZone);
-  const startDay = history.today - days + 1;
-  const events = history.events.filter((event) => event.day >= startDay);
-  const totals = summarizeDoses(events);
-  const categoryByMedication = new Map(medications.map((medication) => [medication.id, medication.category]));
-  const categoryEvents = /* @__PURE__ */ new Map();
-  for (const event of events) {
-    if (!event.due) continue;
-    const category = categoryByMedication.get(event.medicationId) ?? "Other";
-    const group = categoryEvents.get(category);
-    if (group) group.push(event);
-    else categoryEvents.set(category, [event]);
-  }
-  return {
-    timeRangeDays: days,
-    timeZone: history.timeZone,
-    averageAdherence: totals.rate,
-    totalScheduled: totals.scheduled,
-    totalTaken: totals.taken,
-    totalMissed: totals.missed,
-    totalSkipped: totals.skipped,
-    totalPending: totals.pending,
-    dailyTrends: Array.from({ length: days }, (_2, offset) => {
-      const day = startDay + offset;
-      const date = new Date(day * DAY_MS);
-      const { scheduled, taken, missed, skipped, pending, rate } = summarizeDoses(events.filter((event) => event.day === day));
-      return {
-        date: date.toISOString().slice(0, 10),
-        dayName: DAY_NAMES[date.getUTCDay()],
-        scheduled,
-        taken,
-        missed,
-        skipped,
-        pending,
-        adherenceRate: rate
-      };
-    }),
-    categoryBreakdown: Array.from(categoryEvents, ([category, group]) => {
-      const { scheduled, taken, rate } = summarizeDoses(group);
-      return { category, total: scheduled, taken, rate };
-    })
-  };
-}
-
-// src/routes/analytics.routes.ts
 var router10 = (0, import_express10.Router)();
 router10.use(authenticateJwt);
 var resolvePatientId7 = (req) => {
@@ -70161,10 +70191,6 @@ var resolvePatientId7 = (req) => {
   }
   return "";
 };
-function getPatientTimeZone(patientId) {
-  const patient = db.getPatientProfileById(patientId);
-  return patient && db.getProfileById(patient.user_id)?.timezone || "UTC";
-}
 router10.get("/daily-score", (req, res) => {
   const patientId = resolvePatientId7(req);
   if (!patientId) {
@@ -70172,8 +70198,12 @@ router10.get("/daily-score", (req, res) => {
     return;
   }
   if (!verifyPatientAccess(req, res, patientId, "view")) return;
-  const dateStr = req.query.date;
-  const score = CareScoreService.calculateDailyCareScore(patientId, dateStr);
+  const date = external_exports.string().date().optional().safeParse(req.query.date);
+  if (!date.success) {
+    res.status(400).json({ error: "Date must be a valid YYYY-MM-DD value." });
+    return;
+  }
+  const score = CareScoreService.calculateDailyCareScore(patientId, date.data);
   res.json({ score });
 });
 router10.get("/adherence-patterns", (req, res) => {
@@ -70185,7 +70215,7 @@ router10.get("/adherence-patterns", (req, res) => {
   if (!verifyPatientAccess(req, res, patientId, "view")) return;
   const medications = db.getMedications(patientId, true);
   const records = db.getAdministrationRecords(patientId);
-  const insight = generateAdherenceInsight(medications, records, /* @__PURE__ */ new Date(), getPatientTimeZone(patientId));
+  const insight = generateAdherenceInsight(medications, records, /* @__PURE__ */ new Date(), db.getPatientTimeZone(patientId));
   res.json({ insight });
 });
 router10.get("/adherence", (req, res) => {
@@ -70202,8 +70232,12 @@ router10.get("/adherence", (req, res) => {
   }
   const medications = db.getMedications(patientId);
   const records = db.getAdministrationRecords(patientId);
-  res.json(generateAdherenceTrend(medications, records, days, /* @__PURE__ */ new Date(), getPatientTimeZone(patientId)));
+  res.json(generateAdherenceTrend(medications, records, days, /* @__PURE__ */ new Date(), db.getPatientTimeZone(patientId)));
 });
+function csvCell(value = "") {
+  const text = /^[\s]*[=+@-]/.test(value) || /^[\t\r\n]/.test(value) ? "'" + value : value;
+  return '"' + text.replace(/"/g, '""') + '"';
+}
 router10.get("/export-csv", (req, res) => {
   const patientId = resolvePatientId7(req);
   if (!patientId) {
@@ -70214,28 +70248,26 @@ router10.get("/export-csv", (req, res) => {
   const patient = db.getPatientProfileById(patientId);
   const user = patient ? db.getProfileById(patient.user_id) : void 0;
   const records = db.getAdministrationRecords(patientId);
-  const csvRows = [];
-  csvRows.push("Record ID,Patient Name,Medication,Category,Dosage,Scheduled Time,Actual Time,Status,Recorded By,Notes");
-  records.forEach((r2) => {
-    const med = r2.medication;
-    const recordedBy = r2.recorded_by_user ? r2.recorded_by_user.full_name : "Patient";
-    csvRows.push(
-      [
-        `"${r2.id}"`,
-        `"${user?.full_name || "Patient"}"`,
-        `"${med?.name || "Medication"}"`,
-        `"${med?.category || ""}"`,
-        `"${med?.dosage || ""}"`,
-        `"${r2.scheduled_time}"`,
-        `"${r2.actual_time || "N/A"}"`,
-        `"${r2.status}"`,
-        `"${recordedBy}"`,
-        `"${(r2.notes || "").replace(/"/g, '""')}"`
-      ].join(",")
-    );
-  });
+  const csvRows = ["Record ID,Patient Name,Medication,Category,Dosage,Scheduled Time,Actual Time,Status,Recorded By,Notes"];
+  for (const record of records) {
+    const med = record.medication;
+    const cells = [
+      record.id,
+      user?.full_name || "Patient",
+      med?.name || "Medication",
+      med?.category,
+      med?.dosage,
+      record.scheduled_time,
+      record.actual_time,
+      record.status,
+      record.recorded_by_user?.full_name,
+      record.notes
+    ];
+    csvRows.push(cells.map(csvCell).join(","));
+  }
   const csvContent = csvRows.join("\n");
-  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Content-Disposition", `attachment; filename="careverse-report-${patientId.substring(0, 8)}.csv"`);
   res.status(200).send(csvContent);
 });

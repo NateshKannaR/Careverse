@@ -1,6 +1,21 @@
 import { db } from '../db/storageAdapter.js';
 import { CareScoreService } from './careScoreService.js';
 const MEDICAL_DISCLAIMER = 'IMPORTANT MEDICAL DISCLAIMER: CareBuddy is an AI routine support assistant and does NOT provide medical advice, diagnosis, dosage adjustments, or emergency triage. Always consult your doctor, pharmacist, or dial emergency services (911 / 112) for clinical concerns.';
+function doseSummary(metrics) {
+    return `${metrics.completedDoses} taken, ${metrics.missedDoses} missed, ${metrics.skippedDoses} skipped, ${metrics.pendingDoses} awaiting a record, ${metrics.upcomingDoses} upcoming`;
+}
+function scoreSummary(careScore) {
+    return careScore.score === null
+        ? 'No activity recorded yet'
+        : `${careScore.score}% (${careScore.metrics.completedItems} of ${careScore.metrics.routineItems} routine items completed)`;
+}
+function upcomingAppointments(patientId, score, now) {
+    const time = new Intl.DateTimeFormat('en-GB', {
+        timeZone: score.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).format(now);
+    return db.getAppointments(patientId).filter(appointment => appointment.status === 'scheduled' && (appointment.appointment_date > score.date
+        || (appointment.appointment_date === score.date && appointment.appointment_time >= time))).sort((a, b) => `${a.appointment_date}T${a.appointment_time}`.localeCompare(`${b.appointment_date}T${b.appointment_time}`));
+}
 export class CareBuddyService {
     /**
      * Generates intelligent, contextual response using the patient's authenticated medical records.
@@ -10,10 +25,10 @@ export class CareBuddyService {
         const patientUser = patient ? db.getProfileById(patient.user_id) : undefined;
         const patientName = patientUser?.full_name || 'Patient';
         const meds = db.getMedications(patientId, true);
-        const appointments = db.getAppointments(patientId).filter(a => a.status === 'scheduled');
-        const careScore = CareScoreService.calculateDailyCareScore(patientId);
-        const checkin = db.getWellbeingCheckinToday(patientId);
-        const notes = db.getCareNotes(patientId);
+        const now = new Date();
+        const careScore = CareScoreService.calculateDailyCareScore(patientId, undefined, now);
+        const appointments = upcomingAppointments(patientId, careScore, now);
+        const checkin = db.getWellbeingCheckinForDate(patientId, careScore.date);
         const contextUsed = {
             patientName,
             activeMedsCount: meds.length,
@@ -22,6 +37,15 @@ export class CareBuddyService {
             upcomingAppointmentsCount: appointments.length
         };
         const query = userMessage.toLowerCase().trim();
+        if (/\b(?:double|forgot|make up)\b|\b(?:can|could|should)\s+i\b[^?]*\b(?:take|skip|repeat)\b|\bi\s+missed\b/.test(query)) {
+            return {
+                reply: 'Contact your prescribing clinic or local pharmacist for instructions specific to the medication. They can tell you whether a late dose is appropriate. Share the medication name, scheduled time, and what you have already taken.',
+                suggestedFollowUps: ['Show my medication schedule', 'Summarize my day'],
+                contextUsed,
+                disclaimer: MEDICAL_DISCLAIMER,
+                source: 'contextual-assistant'
+            };
+        }
         // Contextual responses based on patient's real data
         if (query.includes('summar') ||
             query.includes('today') ||
@@ -30,20 +54,14 @@ export class CareBuddyService {
             query.includes('progress')) {
             const summaryText = [
                 `Good day, ${patientName}! Here is your current daily care overview:`,
-                `- **Medications:** You have taken **${careScore.metrics.completedDoses} of ${careScore.metrics.scheduledDoses}** scheduled doses today.`,
-                careScore.metrics.pendingDoses > 0
-                    ? `- **Pending Doses:** You have **${careScore.metrics.pendingDoses}** doses remaining for today.`
-                    : `- **Pending Doses:** All scheduled doses for today have been completed! Outstanding job.`,
-                careScore.metrics.missedDoses > 0
-                    ? `- **Missed Doses:** There are ${careScore.metrics.missedDoses} unrecorded doses from earlier today.`
-                    : '',
+                `- **Medications:** ${doseSummary(careScore.metrics)}.`,
                 checkin
                     ? `- **Wellbeing Check-in:** Recorded (Mood: *${checkin.mood}*, Energy: *${checkin.energy_level}/5*).`
                     : `- **Wellbeing Check-in:** You have not recorded your daily check-in yet. Would you like to do that now?`,
                 appointments.length > 0
                     ? `- **Next Appointment:** With **${appointments[0].doctor_name}** (${appointments[0].specialty}) on **${appointments[0].appointment_date} at ${appointments[0].appointment_time}**.`
-                    : `- **Appointments:** No medical visits scheduled for this week.`,
-                `- **Daily Routine Care Score:** **${careScore.score}%** (${careScore.rating}).`
+                    : `- **Appointments:** No upcoming appointments are recorded.`,
+                `- **Daily Routine Care Score:** ${scoreSummary(careScore)}.`
             ]
                 .filter(Boolean)
                 .join('\n');
@@ -59,29 +77,12 @@ export class CareBuddyService {
                 source: 'contextual-assistant'
             };
         }
-        if (query.includes('miss') || query.includes('double') || query.includes('forgot')) {
-            const reply = [
-                `**Safety Protocol for Missed Doses:**`,
-                `• **NEVER take a double dose** to compensate for a missed dose. Doing so can cause sudden side effects or toxicity.`,
-                `• If only a short time has passed, follow your clinician's or pharmacist's specific guidelines on whether to take it or skip.`,
-                `• If it is almost time for your next scheduled dose, skip the missed dose and resume your regular schedule.`,
-                `• When in doubt, contact your prescribing clinic or local pharmacist directly for guidance.`
-            ].join('\n');
-            return {
-                reply,
-                suggestedFollowUps: ['Show my medication schedule', 'Summarize my day'],
-                contextUsed,
-                disclaimer: MEDICAL_DISCLAIMER,
-                source: 'contextual-assistant'
-            };
-        }
         if (query.includes('pill') || query.includes('medication') || query.includes('dose') || query.includes('schedule')) {
             const medList = meds.map(m => `• **${m.name}** (${m.dosage}, ${m.strength || ''}): Scheduled at ${m.times_of_day.join(', ')}. ${m.instructions || ''}`).join('\n');
             const reply = [
                 `Here are the active medications prescribed for ${patientName}:`,
                 medList || 'No active medications currently recorded.',
-                `\n**Today's Status:** ${careScore.metrics.completedDoses} taken, ${careScore.metrics.pendingDoses} upcoming, ${careScore.metrics.missedDoses} missed.`,
-                `\n*Refill Notice:* If your medication supply reaches 5 doses or fewer, CAREVERSE will automatically notify your Care Circle.`
+                `\n**Today's status:** ${doseSummary(careScore.metrics)}.`
             ].join('\n');
             return {
                 reply,
@@ -160,7 +161,7 @@ export class CareBuddyService {
         // Default friendly assistant response
         const defaultReply = [
             `Hello ${patientName}! I am **CareBuddy**, your personal healthcare assistant in CAREVERSE.`,
-            `I can help you review your **daily medication schedule**, prepare for your **upcoming appointment with ${appointments[0]?.doctor_name || 'your clinician'}**, check your **Daily Care Score (${careScore.score}%)**, and explain medical terms in plain English.`,
+            `I can help you review your **daily medication schedule**, prepare for your **upcoming appointment with ${appointments[0]?.doctor_name || 'your clinician'}**, check your **daily routine progress**, and explain medical terms in plain English.`,
             `\nHow can I help you right now?`
         ].join('\n');
         return {
@@ -183,15 +184,16 @@ export class CareBuddyService {
         const patient = db.getPatientProfileById(patientId);
         const user = patient ? db.getProfileById(patient.user_id) : undefined;
         const name = user?.full_name || 'Your loved one';
-        const score = CareScoreService.calculateDailyCareScore(patientId);
-        const checkin = db.getWellbeingCheckinToday(patientId);
-        const appts = db.getAppointments(patientId).filter(a => a.status === 'scheduled');
+        const now = new Date();
+        const score = CareScoreService.calculateDailyCareScore(patientId, undefined, now);
+        const checkin = db.getWellbeingCheckinForDate(patientId, score.date);
+        const appts = upcomingAppointments(patientId, score, now);
         return [
             `CAREVERSE Family Daily Digest for ${name} (${score.date}):`,
-            `• Routine Completion: ${score.score}% (${score.rating})`,
-            `• Medication Doses: ${score.metrics.completedDoses} completed, ${score.metrics.pendingDoses} upcoming, ${score.metrics.missedDoses} missed`,
+            `• Routine Completion: ${scoreSummary(score)}`,
+            `• Medication Doses: ${doseSummary(score.metrics)}`,
             checkin ? `• Wellbeing: Feeling ${checkin.mood} (Energy: ${checkin.energy_level}/5, Pain: ${checkin.pain_level}/10)` : `• Wellbeing: Check-in pending`,
-            appts.length > 0 ? `• Next Appointment: ${appts[0].doctor_name} (${appts[0].specialty}) on ${appts[0].appointment_date}` : `• No appointments today.`
+            appts.length > 0 ? `• Next Appointment: ${appts[0].doctor_name} (${appts[0].specialty}) on ${appts[0].appointment_date}` : `• No upcoming appointments are recorded.`
         ].join('\n');
     }
 }

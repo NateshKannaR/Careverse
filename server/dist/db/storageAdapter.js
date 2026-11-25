@@ -360,6 +360,29 @@ class StorageAdapter {
                 created_at: new Date().toISOString()
             }
         ];
+        // Fictional dose history for the public demo, stored as ordinary records.
+        const demoHistory = [
+            ['taken', 'missed'],
+            ['taken', 'taken'],
+            ['skipped', 'taken'],
+            ['taken', 'due_now'],
+            ['taken', 'taken'],
+            ['missed', 'taken'],
+        ];
+        demoHistory.forEach((statuses, offset) => {
+            const date = new Date(Date.parse(`${today}T00:00:00Z`) - (offset + 1) * 86400000).toISOString().slice(0, 10);
+            statuses.forEach((status, index) => {
+                const scheduled = `${date}T${index === 0 ? '13' : '20'}:00:00Z`;
+                this.store.administrationRecords.push({
+                    id: `demo-history-${date}-${index}`,
+                    patient_id: patientProfile.id,
+                    medication_id: index === 0 ? med1.id : med2.id,
+                    scheduled_time: scheduled,
+                    status,
+                    ...(status === 'taken' ? { actual_time: scheduled, recorded_by: eleanor.id } : {}),
+                });
+            });
+        });
         // Appointments
         const apptDate1 = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
         const apptDate2 = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
@@ -802,9 +825,12 @@ class StorageAdapter {
         return true;
     }
     // --- Wellbeing Check-ins ---
-    getWellbeingCheckinToday(patientId) {
-        const today = new Date().toISOString().split('T')[0];
-        return this.store.wellbeingCheckins.find(w => w.patient_id === patientId && w.checkin_date === today);
+    getPatientTimeZone(patientId) {
+        const patient = this.getPatientProfileById(patientId);
+        return (patient && this.getProfileById(patient.user_id)?.timezone) || 'UTC';
+    }
+    getWellbeingCheckinForDate(patientId, date) {
+        return this.store.wellbeingCheckins.find(checkin => checkin.patient_id === patientId && checkin.checkin_date === date);
     }
     getWellbeingCheckins(patientId, limit = 30) {
         return this.store.wellbeingCheckins

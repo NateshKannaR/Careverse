@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
+import { getPatientDate } from '../services/adherencePatternService.js';
 const router = Router();
 router.use(authenticateJwt);
 const checkinSchema = z.object({
@@ -40,7 +41,7 @@ router.get('/today', (req, res) => {
     }
     if (!verifyPatientAccess(req, res, patientId, 'view'))
         return;
-    const checkin = db.getWellbeingCheckinToday(patientId);
+    const checkin = db.getWellbeingCheckinForDate(patientId, getPatientDate(new Date(), db.getPatientTimeZone(patientId)));
     res.json({ checkin: checkin || null });
 });
 // GET /api/wellbeing/history
@@ -70,7 +71,7 @@ router.post('/', (req, res) => {
     }
     if (!verifyPatientAccess(req, res, patientId, 'view'))
         return;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getPatientDate(new Date(), db.getPatientTimeZone(patientId));
     const checkin = {
         id: uuidv4(),
         patient_id: patientId,

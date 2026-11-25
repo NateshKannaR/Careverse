@@ -47,11 +47,10 @@ function collectEvents(records, now, timeZone) {
         if (day > today)
             continue;
         events.push({
-            medicationId: record.medication_id,
+            record,
             day,
             hour,
             due: timestamp <= now.getTime(),
-            status: record.status,
         });
     }
     return { events, today, timeZone: calendar.timeZone };
@@ -64,7 +63,7 @@ function summarizeDoses(events) {
     for (const event of events) {
         if (!event.due)
             continue;
-        switch (event.status) {
+        switch (event.record.status) {
             case 'taken':
                 taken += 1;
                 break;
@@ -81,11 +80,33 @@ function summarizeDoses(events) {
     const rate = recorded > 0 ? Math.round(taken / recorded * 100) : null;
     return { scheduled: recorded + pending, recorded, taken, missed, skipped, pending, rate };
 }
+export function getPatientDate(now, timeZone) {
+    return new Date(makeCalendar(timeZone).read(now).day * DAY_MS).toISOString().slice(0, 10);
+}
+export function getDailyDoseEvidence(records, now, timeZone, date) {
+    const history = collectEvents(records, now, timeZone);
+    const selectedDay = date ? Date.parse(`${date}T00:00:00.000Z`) / DAY_MS : history.today;
+    const events = history.events.filter(event => event.day === selectedDay);
+    const summary = summarizeDoses(events);
+    return {
+        date: date ?? new Date(history.today * DAY_MS).toISOString().slice(0, 10),
+        timeZone: history.timeZone,
+        records: events.map(event => event.record),
+        due: summary.scheduled,
+        taken: summary.taken,
+        missed: summary.missed,
+        skipped: summary.skipped,
+        pending: summary.pending,
+        upcoming: events.length - summary.scheduled,
+        recorded: summary.recorded,
+        rate: summary.rate,
+    };
+}
 function getPatterns(medications, events, today) {
     const activeIds = new Set(medications.filter(medication => medication.is_active).map(medication => medication.id));
     const slotEvents = SLOTS.map(() => []);
     for (const event of events) {
-        if (!event.due || event.day < today - 13 || !activeIds.has(event.medicationId))
+        if (!event.due || event.day < today - 13 || !activeIds.has(event.record.medication_id))
             continue;
         const hour = event.hour < 5 ? event.hour + 24 : event.hour;
         const index = SLOTS.findIndex(slot => hour < slot.endHour);
@@ -113,11 +134,11 @@ function getStreak(events, today) {
     let streak = 0;
     for (let offset = 0; offset < 30; offset += 1) {
         const dayEvents = events.filter(event => event.day === today - offset);
-        if (dayEvents.length > 0 && dayEvents.every(event => event.due && event.status === 'taken')) {
+        if (dayEvents.length > 0 && dayEvents.every(event => event.due && event.record.status === 'taken')) {
             streak += 1;
             continue;
         }
-        if (offset === 0 && !dayEvents.some(event => event.due && (event.status === 'missed' || event.status === 'skipped'))) {
+        if (offset === 0 && !dayEvents.some(event => event.due && (event.record.status === 'missed' || event.record.status === 'skipped'))) {
             continue;
         }
         break;
@@ -161,7 +182,7 @@ export function generateAdherenceTrend(medications, records, days, now = new Dat
     for (const event of events) {
         if (!event.due)
             continue;
-        const category = categoryByMedication.get(event.medicationId) ?? 'Other';
+        const category = categoryByMedication.get(event.record.medication_id) ?? 'Other';
         const group = categoryEvents.get(category);
         if (group)
             group.push(event);
