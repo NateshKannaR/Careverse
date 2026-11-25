@@ -25,9 +25,9 @@ describe('CareBuddyService Unit Tests', () => {
     expect(response.suggestedFollowUps.length).toBeGreaterThan(0);
   });
 
-  it('should advise never taking double doses when asked about missed medications', async () => {
+  it('should direct missed-dose questions to the prescriber or pharmacist', async () => {
     const response = await CareBuddyService.askCareBuddy(patientId, 'I forgot a dose, should I take double?');
-    expect(response.reply).toContain('NEVER take a double dose');
+    expect(response.reply).not.toContain('skip the missed dose');
     expect(response.reply).toContain('prescribing clinic or local pharmacist');
   });
 

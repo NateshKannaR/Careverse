@@ -1,3 +1,4 @@
+import { formatDoseTime } from '../../utils/doseTime.js';
 import React, { useState } from 'react';
 import { MedicationAdministrationRecord } from '../../types/index.js';
 import { api } from '../../services/api.js';
@@ -18,12 +19,14 @@ interface DoseTimelineProps {
   records: MedicationAdministrationRecord[];
   onDoseUpdated: () => void;
   canManageMeds?: boolean;
+  timeZone?: string;
 }
 
 export const DoseTimeline: React.FC<DoseTimelineProps> = ({
   records,
   onDoseUpdated,
-  canManageMeds = true
+  canManageMeds = true,
+  timeZone,
 }) => {
   const { t } = useLanguage();
   const { speakAnnouncement } = useA11y();
@@ -103,6 +106,8 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
         </div>
       </div>
 
+      {timeZone && <p className="text-sm text-slate-600">Dose times in {timeZone}</p>}
+
       {records.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-3xl border border-slate-200 p-6 text-slate-500 text-sm">
           No medication doses scheduled for today.
@@ -111,8 +116,7 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
         <div className="space-y-3">
           {records.map((record) => {
             const med = record.medication;
-            const scheduledDate = new Date(record.scheduled_time);
-            const timeString = scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const timeString = formatDoseTime(record.scheduled_time, timeZone);
             const isTaken = record.status === 'taken';
             const isDueOrUpcoming = record.status === 'due_now' || record.status === 'upcoming';
             const isMissed = record.status === 'missed';
@@ -161,7 +165,7 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
                         </span>
                         {record.actual_time && (
                           <span className="text-emerald-700">
-                            • Taken at: {new Date(record.actual_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            • Taken at: {formatDoseTime(record.actual_time, timeZone)}
                           </span>
                         )}
                         {med?.category && (

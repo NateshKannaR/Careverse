@@ -6,6 +6,7 @@ import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { authorizePatientAccess, verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { Medication, MedicationAdministrationRecord, DoseStatus } from '../types/index.js';
 import { predictAllRefills } from '../services/refillService.js';
+import { getDailyDoseEvidence } from '../services/adherencePatternService.js';
 
 const router = Router();
 router.use(authenticateJwt);
@@ -159,26 +160,27 @@ router.get('/doses/today', (req: Request, res: Response): void => {
 
   if (!verifyPatientAccess(req, res, patientId, 'view')) return;
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const startIso = `${todayStr}T00:00:00.000Z`;
-  const endIso = `${todayStr}T23:59:59.999Z`;
-
-  const records = db.getAdministrationRecords(patientId, startIso, endIso);
-
-  // Sort chronologically by scheduled_time
-  records.sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime());
-
+  const now = new Date();
+  const evidence = getDailyDoseEvidence(db.getAdministrationRecords(patientId), now, db.getPatientTimeZone(patientId));
+  const records = evidence.records
+    .sort((a, b) => Date.parse(a.scheduled_time) - Date.parse(b.scheduled_time))
+    .map(record => {
+      if (record.status !== 'upcoming' && record.status !== 'due_now') return record;
+      return { ...record, status: Date.parse(record.scheduled_time) <= now.getTime() ? 'due_now' : 'upcoming' };
+    });
   res.json({
-    date: todayStr,
+    date: evidence.date,
+    time_zone: evidence.timeZone,
     records,
     summary: {
       total: records.length,
-      taken: records.filter(r => r.status === 'taken').length,
-      upcoming: records.filter(r => r.status === 'upcoming').length,
-      due_now: records.filter(r => r.status === 'due_now').length,
-      missed: records.filter(r => r.status === 'missed').length,
-      skipped: records.filter(r => r.status === 'skipped').length
-    }
+      due: evidence.due,
+      taken: evidence.taken,
+      upcoming: evidence.upcoming,
+      due_now: evidence.pending,
+      missed: evidence.missed,
+      skipped: evidence.skipped,
+    },
   });
 });
 

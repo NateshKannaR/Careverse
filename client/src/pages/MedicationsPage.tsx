@@ -22,6 +22,7 @@ import {
 export const MedicationsPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const [doseTimeZone, setDoseTimeZone] = useState<string>();
 
   const [activeTab, setActiveTab] = useState<'timeline' | 'all'>('timeline');
   const [medications, setMedications] = useState<any[]>([]);
@@ -38,7 +39,10 @@ export const MedicationsPage: React.FC = () => {
         api.medications.getTodayDoses(user?.patient_id)
       ]);
       if (medsRes) setMedications(medsRes.medications || []);
-      if (dosesRes) setTodayDoses(dosesRes.records || []);
+      if (dosesRes) {
+        setTodayDoses(dosesRes.records || []);
+        setDoseTimeZone(dosesRes.time_zone);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -150,7 +154,7 @@ export const MedicationsPage: React.FC = () => {
 
       {activeTab === 'timeline' ? (
         <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
-          <DoseTimeline records={todayDoses} onDoseUpdated={fetchMedications} canManageMeds={true} />
+          <DoseTimeline records={todayDoses} onDoseUpdated={fetchMedications} canManageMeds={true} timeZone={doseTimeZone} />
         </div>
       ) : (
         <div className="space-y-6">

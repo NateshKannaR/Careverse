@@ -1,3 +1,5 @@
+import type { DailyCareScore } from '../types/index.js';
+import { formatDoseTime } from '../utils/doseTime.js';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
@@ -31,13 +33,14 @@ import { Link } from 'react-router-dom';
 export const ElderlyDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const [doseTimeZone, setDoseTimeZone] = useState<string>();
   const { speakAnnouncement } = useA11y();
 
   const [doses, setDoses] = useState<any[]>([]);
   const [doseSummary, setDoseSummary] = useState<any>({ total: 0, taken: 0, upcoming: 0, due_now: 0, missed: 0 });
   const [appointments, setAppointments] = useState<any[]>([]);
   const [careCircle, setCareCircle] = useState<any[]>([]);
-  const [careScore, setCareScore] = useState<any | null>(null);
+  const [careScore, setCareScore] = useState<DailyCareScore | null>(null);
   const [todayCheckin, setTodayCheckin] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -59,6 +62,7 @@ export const ElderlyDashboardPage: React.FC = () => {
 
       if (dosesRes) {
         setDoses(dosesRes.records || []);
+        setDoseTimeZone(dosesRes.time_zone);
         setDoseSummary(dosesRes.summary || { total: 0, taken: 0, upcoming: 0, due_now: 0, missed: 0 });
       }
       if (apptsRes) setAppointments(apptsRes.appointments || []);
@@ -117,7 +121,7 @@ export const ElderlyDashboardPage: React.FC = () => {
                 />
                 <path
                   className="text-emerald-400"
-                  strokeDasharray={`${careScore.score}, 100`}
+                  strokeDasharray={`${careScore.score ?? 0}, 100`}
                   strokeWidth="3.5"
                   strokeLinecap="round"
                   stroke="currentColor"
@@ -126,7 +130,7 @@ export const ElderlyDashboardPage: React.FC = () => {
                 />
               </svg>
               <span className="absolute text-sm font-black text-white">
-                {careScore.score}%
+                {careScore.score === null ? '—' : `${careScore.score}%`}
               </span>
             </div>
             <div>
@@ -134,10 +138,10 @@ export const ElderlyDashboardPage: React.FC = () => {
                 Daily Routine Care Score
               </div>
               <div className="text-base font-extrabold text-white">
-                {careScore.rating}
+                {careScore.score === null ? 'Awaiting activity' : careScore.rating}
               </div>
               <div className="text-[10px] text-teal-200/80">
-                {careScore.metrics.completedDoses}/{careScore.metrics.scheduledDoses} Doses Taken
+                {careScore.metrics.completedItems} of {careScore.metrics.routineItems} routine items completed
               </div>
             </div>
           </div>
@@ -164,7 +168,7 @@ export const ElderlyDashboardPage: React.FC = () => {
                   </h3>
                   <p className="text-xs text-slate-600 flex items-center gap-1.5 mt-0.5">
                     <Clock className="w-3.5 h-3.5 text-teal-700" />
-                    Scheduled for {new Date(nextUpcomingDose.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Scheduled for {formatDoseTime(nextUpcomingDose.scheduled_time, doseTimeZone)}
                     {nextUpcomingDose.medication?.instructions && ` • ${nextUpcomingDose.medication.instructions}`}
                   </p>
                 </div>
@@ -189,7 +193,7 @@ export const ElderlyDashboardPage: React.FC = () => {
               <div>
                 <h2 className="text-lg font-bold text-navy-950">{t.medications.dailySchedule}</h2>
                 <p className="text-xs text-slate-500">
-                  {doseSummary.taken} of {doseSummary.total} doses taken today
+                  {doseSummary.taken} of {doseSummary.due ?? 0} due doses taken
                 </p>
               </div>
               <button
@@ -201,7 +205,7 @@ export const ElderlyDashboardPage: React.FC = () => {
               </button>
             </div>
 
-            <DoseTimeline records={doses} onDoseUpdated={fetchDashboardData} canManageMeds={true} />
+            <DoseTimeline records={doses} onDoseUpdated={fetchDashboardData} canManageMeds={true} timeZone={doseTimeZone} />
           </div>
 
           {/* Adherence Pattern Insights & Habit Guidance */}

@@ -1,220 +1,208 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { BarChart3, CalendarDays, Download } from 'lucide-react';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CareBuddyWidget } from '../components/carebuddy/CareBuddyWidget.js';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
 import { api } from '../services/api.js';
-import { CareBuddyWidget } from '../components/carebuddy/CareBuddyWidget.js';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
-} from 'recharts';
-import {
-  BarChart3,
-  Download,
-  Calendar,
-  CheckCircle2,
-  AlertCircle,
-  Activity
-} from 'lucide-react';
 
-export const AnalyticsPage: React.FC = () => {
+const OUTCOMES = [
+  { key: 'taken', label: 'Taken', color: '#0f766e' },
+  { key: 'missed', label: 'Missed', color: '#be123c' },
+  { key: 'skipped', label: 'Skipped', color: '#475569' },
+  { key: 'pending', label: 'Awaiting a record', color: '#b45309' },
+] as const;
+
+function dayLabel(iso: string, weekday = false) {
+  return new Intl.DateTimeFormat(undefined, {
+    timeZone: 'UTC', month: 'short', day: 'numeric', ...(weekday ? { weekday: 'short' } : {}),
+  }).format(new Date(iso + 'T00:00:00Z'));
+}
+
+export function AnalyticsPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const patientId = user?.patient_id;
+  const [days, setDays] = useState(7);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const report = useQuery({
+    queryKey: ['adherence-report', user?.id, patientId, days],
+    staleTime: 0,
+    queryFn: async ({ signal }) => {
+      const [trend, { score }] = await Promise.all([
+        api.analytics.getAdherence(days, patientId, signal),
+        api.analytics.getDailyScore(patientId, signal),
+      ]);
+      return { trend, score };
+    },
+  });
+  const trend = report.data?.trend;
+  const score = report.data?.score;
+  const recorded = trend ? trend.totalTaken + trend.totalMissed + trend.totalSkipped : 0;
+  const outcomeTotals = trend ? {
+    taken: trend.totalTaken, missed: trend.totalMissed, skipped: trend.totalSkipped, pending: trend.totalPending,
+  } : null;
+  const newestFirst = trend ? [...trend.dailyTrends].reverse() : [];
+  const day = newestFirst.find(row => row.date === selectedDate)
+    ?? newestFirst.find(row => row.scheduled > 0) ?? newestFirst[0];
 
-  const [timeRange, setTimeRange] = useState<number>(7);
-  const [adherenceData, setAdherenceData] = useState<any | null>(null);
-  const [dailyScore, setDailyScore] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      api.analytics.getAdherence(timeRange, user?.patient_id),
-      api.analytics.getDailyScore(user?.patient_id)
-    ])
-      .then(([adherenceRes, scoreRes]) => {
-        setAdherenceData(adherenceRes);
-        setDailyScore(scoreRes.score);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [timeRange, user]);
-
-  const COLORS = ['#0d9488', '#059669', '#3b82f6', '#f59e0b', '#8b5cf6'];
+  async function exportDoseLog() {
+    setExporting(true);
+    setExportError('');
+    try {
+      const blob = await api.analytics.downloadDoseLog(patientId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'careverse-dose-log.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setExportError('The dose log could not be downloaded. Try again.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
-    <div className="care-page animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-navy-950 flex items-center gap-2.5">
-            <BarChart3 className="w-8 h-8 text-teal-600" />
-            <span>{t.analytics.title}</span>
+    <div className="care-page">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl bg-[#113d3c] p-4 text-white sm:p-7">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight sm:text-3xl">
+            <BarChart3 aria-hidden="true" className="h-6 w-6 shrink-0 text-teal-200" />
+            {t.analytics.title}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">{t.analytics.subtitle}</p>
+          <p className="mt-2 text-sm text-teal-100">See what was recorded, what’s due, and where a record is still missing.</p>
         </div>
-
-        <div className="flex w-full flex-wrap items-center gap-2 self-start sm:w-auto sm:self-auto">
-          {/* Time range selector */}
-          <div className="inline-flex flex-wrap items-center bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
-            <button
-              onClick={() => setTimeRange(7)}
-              className={`min-h-11 px-2.5 sm:px-3 rounded-lg transition ${timeRange === 7 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
-            >
-              7 Days
-            </button>
-            <button
-              onClick={() => setTimeRange(14)}
-              className={`min-h-11 px-2.5 sm:px-3 rounded-lg transition ${timeRange === 14 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
-            >
-              14 Days
-            </button>
-            <button
-              onClick={() => setTimeRange(30)}
-              className={`min-h-11 px-2.5 sm:px-3 rounded-lg transition ${timeRange === 30 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
-            >
-              30 Days
-            </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="group" aria-label="Reporting period" className="inline-flex flex-wrap rounded-xl bg-white/10 p-1">
+            {[7, 14, 30].map(period => (
+              <button
+                key={period}
+                type="button"
+                aria-pressed={days === period}
+                onClick={() => { setDays(period); setSelectedDate(''); }}
+                className={`min-h-11 rounded-lg px-3 text-sm font-semibold ${days === period ? 'bg-white text-teal-950' : 'text-white hover:bg-white/15'}`}
+              >
+                {period} days
+              </button>
+            ))}
           </div>
-
-          {/* Real CSV Export Button */}
-          <a
-            href={api.analytics.getExportUrl(user?.patient_id)}
-            download
-            className="inline-flex min-h-11 items-center gap-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold shadow-md transition"
-          >
-            <Download className="w-4 h-4" />
-            <span>{t.analytics.exportCsv}</span>
-          </a>
+          <button type="button" onClick={() => void exportDoseLog()} disabled={exporting}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-teal-200/60 px-3 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-65">
+            <Download aria-hidden="true" className="h-4 w-4 shrink-0" />
+            {exporting ? 'Downloading…' : 'Download dose log'}
+          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Summary KPI Cards */}
-      {adherenceData && (
-        <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
-          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
-            <span className="text-xs font-bold text-slate-500 block mb-1">Average Adherence</span>
-            <div className="text-xl font-black text-teal-700 sm:text-2xl flex items-center gap-1">
-              <span>{adherenceData.averageAdherence == null ? 'No outcomes' : `${adherenceData.averageAdherence}%`}</span>
-            </div>
-            <span className="text-[10px] text-slate-400 mt-1 block">Recorded outcomes over {timeRange} days</span>
-          </div>
-
-          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
-            <span className="text-xs font-bold text-slate-500 block mb-1">Doses Taken</span>
-            <span className="text-2xl font-black text-emerald-600 block">{adherenceData.totalTaken}</span>
-            <span className="text-[10px] text-slate-400 mt-1 block">Of {adherenceData.totalScheduled} due · {adherenceData.totalPending ?? 0} without an outcome</span>
-          </div>
-
-          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
-            <span className="text-xs font-bold text-slate-500 block mb-1">Missed Doses</span>
-            <span className="text-2xl font-black text-rose-600 block">{adherenceData.totalMissed}</span>
-            <span className="text-[10px] text-slate-400 mt-1 block">{adherenceData.totalSkipped ?? 0} skipped</span>
-          </div>
-
-          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
-            <span className="text-xs font-bold text-slate-500 block mb-1">Daily Care Score</span>
-            <span className="text-2xl font-black text-navy-950 block">{dailyScore?.score || 0}%</span>
-            <span className="text-[10px] text-teal-700 font-semibold mt-1 block">
-              Rating: {dailyScore?.rating || 'In Progress'}
-            </span>
-          </div>
+      {exportError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{exportError}</p>}
+      {report.isPending && <p role="status" className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700">Loading recorded activity…</p>}
+      {report.isError && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          <p>Careverse couldn’t load this report.</p>
+          <button type="button" className="min-h-11 rounded-xl bg-white px-3 font-bold text-rose-800" onClick={() => void report.refetch()}>Try again</button>
         </div>
       )}
 
-      {/* Recharts Graphs */}
-      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
-        {/* Adherence Trend Bar Chart */}
-        <div className="min-w-0 lg:col-span-2 bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
-          <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6 pb-4 border-b border-slate-100">
-            <div>
-              <h3 className="font-bold text-base text-navy-950">Daily Medication Adherence</h3>
-              <p className="text-xs text-slate-500">Due doses by recorded status · {adherenceData?.timeZone ?? 'UTC'}</p>
-            </div>
-          </div>
-
-          <div className="h-60 w-full min-w-0 sm:h-72">
-            {adherenceData?.dailyTrends && (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={adherenceData.dailyTrends}>
-                  <XAxis dataKey="dayName" stroke="#94a3b8" fontSize={12} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '16px',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.08)'
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="taken" name="Taken" fill="#0d9488" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="missed" name="Missed" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="skipped" name="Skipped" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="pending" name="Without outcome" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
-        {/* Prescription Category Breakdown */}
-        <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card flex flex-col justify-between">
-          <div>
-            <h3 className="font-bold text-base text-navy-950 mb-1">Prescription Categories</h3>
-            <p className="text-xs text-slate-500 mb-4">Adherence by medical specialty</p>
-
-            <div className="h-52 w-full min-w-0 sm:h-56">
-              {adherenceData?.categoryBreakdown && adherenceData.categoryBreakdown.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={adherenceData.categoryBreakdown}
-                      dataKey="total"
-                      nameKey="category"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={75}
-                      paddingAngle={4}
-                    >
-                      {adherenceData.categoryBreakdown.map((_: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-400 text-xs">
-                  No category data available.
+      {trend && score && outcomeTotals && (
+        <>
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[1.25fr_1fr]">
+            <section className="min-w-0 rounded-3xl border border-teal-200 bg-teal-50 p-4 sm:p-6" aria-labelledby="recorded-adherence">
+              <h2 id="recorded-adherence" className="text-sm font-bold text-teal-950">Recorded adherence</h2>
+              <p className="my-2 text-3xl font-black tracking-tight text-teal-950 sm:text-4xl">
+                {trend.averageAdherence === null ? 'No outcomes' : `${trend.averageAdherence}%`}
+              </p>
+              <p className="text-sm text-teal-900">{trend.totalTaken} of {recorded} recorded doses were taken.</p>
+              {trend.totalScheduled > 0 ? (
+                <div className="mt-4">
+                  <p className="mb-2 text-sm font-semibold text-teal-950">{recorded} of {trend.totalScheduled} due doses have an outcome</p>
+                  <progress className="block h-2 w-full overflow-hidden rounded-full accent-teal-700" max={trend.totalScheduled} value={recorded}
+                    aria-label="Due doses with a recorded outcome" />
                 </div>
-              )}
-            </div>
+              ) : <p className="mt-4 text-sm text-teal-900">No doses became due in this period.</p>}
+            </section>
+            <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-card sm:p-6" aria-labelledby="routine-progress">
+              <h2 id="routine-progress" className="text-sm font-bold text-slate-900">Today’s routine progress</h2>
+              <p className="my-2 text-3xl font-black tracking-tight text-navy-950 sm:text-4xl">
+                {score.score === null ? 'Awaiting activity' : `${score.score}%`}
+              </p>
+              <p className="text-sm text-slate-700">{score.metrics.completedItems} of {score.metrics.routineItems} routine items completed.</p>
+              <p className="mt-3 text-sm text-slate-600">
+                {score.metrics.completedDoses} of {score.metrics.dueDoses} due doses taken · Check-in {score.metrics.wellbeingCheckinRecorded ? 'recorded' : 'pending'}
+              </p>
+            </section>
           </div>
-
-          <div className="space-y-1.5 border-t border-slate-100 pt-3">
-            {adherenceData?.categoryBreakdown?.map((cat: any, idx: number) => (
-              <div key={idx} className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                  <span className="font-medium text-slate-700">{cat.category}</span>
-                </div>
-                <span className="font-bold text-teal-800">{cat.rate == null ? 'No outcomes' : `${cat.rate}% recorded adherence`}</span>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
+            {OUTCOMES.map(outcome => (
+              <div key={outcome.key} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+                <p className="flex items-start gap-2 text-xs font-semibold text-slate-700 sm:text-sm">
+                  <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: outcome.color }} aria-hidden="true" />
+                  {outcome.label}
+                </p>
+                <p className="mt-1 text-2xl font-black tabular-nums text-navy-950">{outcomeTotals[outcome.key]}</p>
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      <CareBuddyWidget patientId={user?.patient_id} />
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[1.6fr_1fr]">
+            <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-card sm:p-6" aria-labelledby="dose-trend">
+              <h2 id="dose-trend" className="text-lg font-bold text-navy-950">Dose activity by day</h2>
+              <p className="text-sm text-slate-600">{days} days · {trend.timeZone}</p>
+              {trend.totalScheduled > 0 && (
+                <div className="mt-4 h-56 min-w-0 sm:h-64" role="img" aria-label="Stacked chart showing counts of taken, missed, skipped, and unresolved doses. Use the day selector for the exact counts.">
+                  <ResponsiveContainer>
+                    <BarChart data={trend.dailyTrends} margin={{ top: 5, left: -26, right: 5, bottom: 0 }}>
+                      <XAxis dataKey="date" tickFormatter={value => dayLabel(value)} tick={{ fill: '#475569', fontSize: 11 }} minTickGap={18} />
+                      <YAxis allowDecimals={false} tick={{ fill: '#475569', fontSize: 11 }} />
+                      <Tooltip labelFormatter={value => dayLabel(value, true)} />
+                      {OUTCOMES.map(outcome => (
+                        <Bar key={outcome.key} dataKey={outcome.key} name={outcome.label} stackId="doses" fill={outcome.color} isAnimationActive={false} />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {day && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                  <label htmlFor="analytics-day" className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <CalendarDays aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" /> Inspect a day
+                  </label>
+                  <select id="analytics-day" value={day.date} onChange={event => setSelectedDate(event.target.value)}
+                    className="my-2 min-h-11 w-full max-w-xs rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900">
+                    {newestFirst.map(row => <option key={row.date} value={row.date}>{dayLabel(row.date, true)}</option>)}
+                  </select>
+                  <dl className="grid grid-cols-2 gap-2 text-sm min-[480px]:grid-cols-4" aria-live="polite">
+                    {OUTCOMES.map(outcome => (
+                      <div key={outcome.key}><dt className="text-slate-700">{outcome.label}</dt><dd className="font-bold tabular-nums text-navy-950">{day[outcome.key]}</dd></div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+            </section>
+            <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-card sm:p-6" aria-labelledby="dose-categories">
+              <h2 id="dose-categories" className="text-lg font-bold text-navy-950">By prescription category</h2>
+              <ul className="mt-3 divide-y divide-slate-200">
+                {trend.categoryBreakdown.map(category => (
+                  <li key={category.category} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+                    <div className="min-w-0 break-words">
+                      <p className="font-semibold text-navy-950">{category.category}</p>
+                      <p className="text-slate-600">{category.taken} taken · {category.total} due</p>
+                    </div>
+                    <p className="font-bold text-teal-800">{category.rate === null ? 'No outcomes' : `${category.rate}% recorded`}</p>
+                  </li>
+                ))}
+              </ul>
+              {trend.categoryBreakdown.length === 0 && <p className="mt-3 text-sm text-slate-600">No due doses for these dates.</p>}
+            </section>
+          </div>
+        </>
+      )}
+      <CareBuddyWidget patientId={patientId} />
     </div>
   );
-};
+}

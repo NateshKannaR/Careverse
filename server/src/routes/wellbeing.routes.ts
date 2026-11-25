@@ -5,6 +5,7 @@ import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { WellbeingCheckin } from '../types/index.js';
+import { getPatientDate } from '../services/adherencePatternService.js';
 
 const router = Router();
 router.use(authenticateJwt);
@@ -41,7 +42,7 @@ router.get('/today', (req: Request, res: Response): void => {
 
   if (!verifyPatientAccess(req, res, patientId, 'view')) return;
 
-  const checkin = db.getWellbeingCheckinToday(patientId);
+  const checkin = db.getWellbeingCheckinForDate(patientId, getPatientDate(new Date(), db.getPatientTimeZone(patientId)));
   res.json({ checkin: checkin || null });
 });
 
@@ -77,7 +78,7 @@ router.post('/', (req: Request, res: Response): void => {
   if (!verifyPatientAccess(req, res, patientId, 'view')) return;
 
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getPatientDate(new Date(), db.getPatientTimeZone(patientId));
 
   const checkin: WellbeingCheckin = {
     id: uuidv4(),

@@ -160,7 +160,8 @@ export interface NotificationPreferences {
 
 export interface DailyCareScore {
   date: string;
-  score: number;
+  timeZone: string;
+  score: number | null;
   rating: 'Excellent' | 'Good' | 'Needs Attention' | 'In Progress';
   disclaimer: string;
   metrics: {
@@ -168,10 +169,38 @@ export interface DailyCareScore {
     completedDoses: number;
     pendingDoses: number;
     missedDoses: number;
-    doseAdherencePercentage: number;
+    skippedDoses: number;
+    dueDoses: number;
+    upcomingDoses: number;
+    recordedDoses: number;
+    completedItems: number;
+    routineItems: number;
+    doseAdherencePercentage: number | null;
     wellbeingCheckinRecorded: boolean;
     upcomingAppointmentsCount: number;
   };
+}
+
+export interface AdherenceTrend {
+  timeRangeDays: number;
+  timeZone: string;
+  averageAdherence: number | null;
+  totalScheduled: number;
+  totalTaken: number;
+  totalMissed: number;
+  totalSkipped: number;
+  totalPending: number;
+  dailyTrends: {
+    date: string;
+    dayName: string;
+    scheduled: number;
+    taken: number;
+    missed: number;
+    skipped: number;
+    pending: number;
+    adherenceRate: number | null;
+  }[];
+  categoryBreakdown: { category: string; total: number; taken: number; rate: number | null }[];
 }
 
 export interface AuditLog {

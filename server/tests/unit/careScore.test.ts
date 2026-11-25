@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CareScoreService } from '../../src/services/careScoreService.js';
 import { db } from '../../src/db/storageAdapter.js';
 
@@ -6,8 +6,12 @@ describe('CareScoreService Unit Tests', () => {
   const patientId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-25T18:00:00Z'));
     db.seedInitialData();
   });
+
+  afterEach(() => vi.useRealTimers());
 
   it('should calculate transparent daily care score for seeded demo patient', () => {
     const score = CareScoreService.calculateDailyCareScore(patientId);

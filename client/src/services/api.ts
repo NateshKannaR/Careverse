@@ -1,3 +1,4 @@
+import type { AdherenceTrend, DailyCareScore } from '../types/index.js';
 import type { ClientAdherenceInsight } from '../utils/adherenceInsights.js';
 
 const getAuthHeaders = (): Record<string, string> => {
@@ -215,21 +216,28 @@ export const api = {
 
   // Analytics
   analytics: {
-    getAdherence: (days: number = 7, patientId?: string) => {
-      const q = new URLSearchParams({ days: String(days) });
-      if (patientId) q.append('patientId', patientId);
-      return fetch(`/api/analytics/adherence?${q.toString()}`, { headers: getAuthHeaders() }).then<any>(handleResponse);
+    getAdherence: (days = 7, patientId?: string, signal?: AbortSignal) => {
+      const query = new URLSearchParams({ days: String(days) });
+      if (patientId) query.set('patientId', patientId);
+      return fetch(`/api/analytics/adherence?${query}`, { headers: getAuthHeaders(), signal })
+        .then(handleResponse<AdherenceTrend>);
     },
-    getDailyScore: (patientId?: string) => {
-      const q = patientId ? `?patientId=${patientId}` : '';
-      return fetch(`/api/analytics/daily-score${q}`, { headers: getAuthHeaders() }).then<any>(handleResponse);
+    getDailyScore: (patientId?: string, signal?: AbortSignal) => {
+      const query = new URLSearchParams(patientId ? { patientId } : {});
+      return fetch(`/api/analytics/daily-score?${query}`, { headers: getAuthHeaders(), signal })
+        .then(handleResponse<{ score: DailyCareScore }>);
     },
     getAdherencePatterns: (patientId?: string, signal?: AbortSignal) => {
       const query = new URLSearchParams(patientId ? { patient_id: patientId } : {});
       return fetch(`/api/analytics/adherence-patterns?${query}`, { headers: getAuthHeaders(), signal })
         .then(handleResponse<{ insight: ClientAdherenceInsight }>);
     },
-    getExportUrl: (patientId?: string) => `/api/analytics/export-csv${patientId ? `?patientId=${patientId}` : ''}`
+    downloadDoseLog: async (patientId?: string) => {
+      const query = new URLSearchParams(patientId ? { patientId } : {});
+      const response = await fetch(`/api/analytics/export-csv?${query}`, { headers: getAuthHeaders() });
+      if (!response.ok) await handleResponse(response);
+      return response.blob();
+    }
   },
 
   // Emergency SOS

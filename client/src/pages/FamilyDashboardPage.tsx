@@ -1,3 +1,5 @@
+import type { DailyCareScore } from '../types/index.js';
+import { formatDoseTime } from '../utils/doseTime.js';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
@@ -22,6 +24,7 @@ import {
 export const FamilyDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const [doseTimeZone, setDoseTimeZone] = useState<string>();
 
   const [accessiblePatients, setAccessiblePatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
@@ -29,7 +32,7 @@ export const FamilyDashboardPage: React.FC = () => {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [careNotes, setCareNotes] = useState<any[]>([]);
   const [familyDigest, setFamilyDigest] = useState<string>('');
-  const [careScore, setCareScore] = useState<any | null>(null);
+  const [careScore, setCareScore] = useState<DailyCareScore | null>(null);
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +58,10 @@ export const FamilyDashboardPage: React.FC = () => {
         api.analytics.getDailyScore(patientId)
       ]);
 
-      if (dosesRes) setDoses(dosesRes.records || []);
+      if (dosesRes) {
+        setDoses(dosesRes.records || []);
+        setDoseTimeZone(dosesRes.time_zone);
+      }
       if (apptsRes) setAppointments(apptsRes.appointments || []);
       if (notesRes) setCareNotes(notesRes.notes || []);
       if (digestRes) setFamilyDigest(digestRes.digest || '');
@@ -139,13 +145,13 @@ export const FamilyDashboardPage: React.FC = () => {
                   <Activity className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-navy-950">Daily Care Digest for Eleanor</h3>
-                  <span className="text-xs text-slate-500">Generated from real today events</span>
+                  <h3 className="font-bold text-base text-navy-950">Daily care digest</h3>
+                  <span className="text-xs text-slate-500">Based on today’s recorded activity</span>
                 </div>
               </div>
               {careScore && (
                 <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
-                  Score: {careScore.score}% ({careScore.rating})
+                  {careScore.score === null ? 'Awaiting activity' : `${careScore.score}% routine completion`}
                 </span>
               )}
             </div>
@@ -158,7 +164,7 @@ export const FamilyDashboardPage: React.FC = () => {
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
                 <span className="block text-xl font-black text-emerald-700">
-                  {doses.filter(d => d.status === 'taken').length}
+                  {careScore?.metrics.completedDoses ?? 0}
                 </span>
                 <span className="text-[11px] font-bold text-emerald-900 uppercase">Doses Taken</span>
               </div>
@@ -201,8 +207,8 @@ export const FamilyDashboardPage: React.FC = () => {
                         {record.medication?.name} ({record.medication?.dosage})
                       </span>
                       <span className="text-slate-500">
-                        Scheduled: {new Date(record.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {record.actual_time && ` • Taken at ${new Date(record.actual_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                        Scheduled: {formatDoseTime(record.scheduled_time, doseTimeZone)}
+                        {record.actual_time && ` • Taken at ${formatDoseTime(record.actual_time, doseTimeZone)}`}
                       </span>
                     </div>
                   </div>

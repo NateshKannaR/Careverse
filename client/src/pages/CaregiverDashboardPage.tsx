@@ -1,3 +1,4 @@
+import { formatDoseTime } from '../utils/doseTime.js';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
@@ -20,6 +21,7 @@ import {
 export const CaregiverDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const [doseTimeZone, setDoseTimeZone] = useState<string>();
 
   const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
@@ -53,7 +55,10 @@ export const CaregiverDashboardPage: React.FC = () => {
         api.careNotes.getAll(patientId)
       ]);
 
-      if (dosesRes) setDoses(dosesRes.records || []);
+      if (dosesRes) {
+        setDoses(dosesRes.records || []);
+        setDoseTimeZone(dosesRes.time_zone);
+      }
       if (apptsRes) setAppointments(apptsRes.appointments || []);
       if (notesRes) setCareNotes(notesRes.notes || []);
     } catch (err) {
@@ -200,7 +205,7 @@ export const CaregiverDashboardPage: React.FC = () => {
                           {record.medication?.dosage}
                         </span>
                         <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
-                          Due: {new Date(record.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          Due: {formatDoseTime(record.scheduled_time, doseTimeZone)}
                         </span>
                       </div>
                       <p className="text-xs text-slate-600 italic">
