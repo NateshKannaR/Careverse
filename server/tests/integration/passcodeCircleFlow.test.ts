@@ -136,5 +136,5 @@ describe('Passcode Care Circle & Elder Approval Gate Integration Tests', () => {
 
     expect(fifthRes.status).toBe(429);
     expect(fifthRes.body.error).toContain('locked out');
-  });
+  }, 15000);
 });

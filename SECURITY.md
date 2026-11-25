@@ -134,3 +134,17 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
          v
   [8. Structured Audit Log]          (Append-only record of actor, action, timestamp, IP)
 ```
+
+---
+
+## 6. Formal STRIDE Threat Model & Verification Mapping
+
+| STRIDE Category | Threat Description | Architectural Mitigation | Automated Verification Test |
+| :--- | :--- | :--- | :--- |
+| **S - Spoofing** | Attacker impersonates an elderly user or fabricates session identity. | Cryptographic JWT bearer tokens with expiration; 10-round bcrypt salted passcodes (`CARE-2026`) with constant-time comparison. | `server/tests/integration/authAndRbac.test.ts`<br/>`server/tests/unit/passcodeAndRateLimit.test.ts` |
+| **T - Tampering** | Rogue actor modifies medication logs or alters dosage history. | Idempotent dose state machine rejecting duplicate state transitions; immutable audit stream. | `server/tests/integration/medicationDoses.test.ts` |
+| **R - Repudiation** | User denies performing an action (e.g. revoking a caregiver or triggering SOS). | Append-only `audit_logs` storing actor UUID, client IP, user agent, action enum, and timestamp. | `server/tests/integration/securityIsolation.test.ts` |
+| **I - Information Disclosure** | Attacker manipulates patient UUID to read unauthorized health records (BOLA/IDOR). | `checkPatientAccess` middleware enforcing ownership, active circle membership, or admin role. Cross-patient calls return HTTP 403. | `server/tests/integration/securityIsolation.test.ts` |
+| **D - Denial of Service** | Attacker floods passcode endpoints with brute-force attempts. | Sliding-window rate limiting; 5 failed attempts locks out caller with HTTP 429 for 15 minutes. | `server/tests/integration/passcodeCircleFlow.test.ts` |
+| **E - Elevation of Privilege** | View-only family member attempts to create prescriptions or delete appointments. | Granular permission bits (`can_manage_meds`, `can_manage_appts`, `can_manage_notes`) enforced at route level. | `server/tests/integration/authAndRbac.test.ts` |
+
