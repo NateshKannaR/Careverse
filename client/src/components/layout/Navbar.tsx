@@ -1,38 +1,35 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import {
+  BarChart3, Calendar, Heart, KeyRound, LogOut, Mail, Menu, Pill, Settings, ShieldAlert, Users, X,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 import { useLanguage } from '../../context/LanguageContext.js';
+import type { UserRole } from '../../types/index.js';
 import { A11yToolbar } from '../accessibility/A11yToolbar.js';
+import { PasscodeCircleModal } from '../carecircle/PasscodeCircleModal.js';
 import { EmergencySOSModal } from '../emergency/EmergencySOSModal.js';
 import { NotificationSimulatorModal } from '../notifications/NotificationSimulatorModal.js';
-import {
-  Heart,
-  Pill,
-  Calendar,
-  Users,
-  BarChart3,
-  Bell,
-  Settings,
-  ShieldAlert,
-  LogOut,
-  UserCheck,
-  Menu,
-  X,
-  Mail,
-  KeyRound
-} from 'lucide-react';
-import { UserRole } from '../../types/index.js';
-import { PasscodeCircleModal } from '../carecircle/PasscodeCircleModal.js';
+
+const demoRoles = [
+  { role: 'elderly', label: 'Patient' },
+  { role: 'family', label: 'Family' },
+  { role: 'caregiver', label: 'Caregiver' },
+  { role: 'admin', label: 'Admin' },
+] as const;
 
 export const Navbar: React.FC = () => {
   const { user, logout, demoLogin } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
-
+  const header = useRef<HTMLElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [rolePending, setRolePending] = useState<UserRole>();
+  const [roleError, setRoleError] = useState('');
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [passcodeModalOpen, setPasscodeModalOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
     { to: '/dashboard', label: t.nav.dashboard, icon: Heart },
@@ -40,229 +37,195 @@ export const Navbar: React.FC = () => {
     { to: '/appointments', label: t.nav.appointments, icon: Calendar },
     { to: '/care-circle', label: t.nav.careCircle, icon: Users },
     { to: '/analytics', label: t.nav.analytics, icon: BarChart3 },
-    { to: '/settings', label: t.nav.settings, icon: Settings }
+    { to: '/settings', label: t.nav.settings, icon: Settings },
   ];
 
-  const handleRoleSwitch = (role: UserRole) => {
-    demoLogin(role);
-  };
+  useEffect(() => {
+    setMenuOpen(false);
+    setRoleError('');
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setMenuOpen(false);
+      menuButton.current?.focus();
+    };
+    const dismissOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !header.current?.contains(event.target)) setMenuOpen(false);
+    };
+    document.addEventListener('keydown', dismissOnEscape);
+    document.addEventListener('pointerdown', dismissOnOutsideClick);
+    return () => {
+      document.removeEventListener('keydown', dismissOnEscape);
+      document.removeEventListener('pointerdown', dismissOnOutsideClick);
+    };
+  }, [menuOpen]);
+
+  async function switchDemoRole(role: UserRole) {
+    setRolePending(role);
+    setRoleError('');
+    try {
+      await demoLogin(role);
+      setMenuOpen(false);
+      menuButton.current?.focus();
+    } catch {
+      setRoleError('Unable to open the demo account. Try again.');
+    } finally {
+      setRolePending(undefined);
+    }
+  }
+
+  const navItems = navLinks.map(({ to, label, icon: Icon }) => (
+    <NavLink
+      key={to}
+      to={to}
+      onClick={() => setMenuOpen(false)}
+      className={({ isActive }) => `flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+        isActive ? 'bg-teal-50 text-teal-900' : 'text-slate-700 hover:bg-slate-100'
+      }`}
+    >
+      <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
+      <span>{label}</span>
+    </NavLink>
+  ));
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20 gap-4">
-            {/* Logo */}
-            <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2.5 flex-shrink-0 group">
-              <div className="w-10 h-10 rounded-2xl bg-teal-600 group-hover:bg-teal-700 flex items-center justify-center text-white shadow-md transition-colors">
-                <Heart className="w-6 h-6 fill-white" />
-              </div>
-              <div>
-                <span className="text-xl sm:text-2xl font-black tracking-tight text-navy-900 flex items-center gap-1">
-                  CARE<span className="text-teal-600">VERSE</span>
-                </span>
-                <span className="hidden lg:block text-[10px] font-semibold text-slate-500 uppercase tracking-widest -mt-1">
-                  Connected Elderly Healthcare
-                </span>
-              </div>
+      <header ref={header} className="sticky top-0 z-[45] border-b border-slate-200 bg-white shadow-sm">
+        <div className="care-width relative">
+          <div className="flex min-h-[3.75rem] items-center justify-between gap-2 py-2 sm:min-h-[4.25rem] sm:gap-4">
+            <Link
+              to={user ? '/dashboard' : '/'}
+              className="inline-flex min-w-0 items-center gap-2 text-lg font-black tracking-tight text-navy-950 sm:text-xl"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-teal-700 text-white sm:h-10 sm:w-10">
+                <Heart aria-hidden="true" className="h-4 w-4 fill-current sm:h-5 sm:w-5" />
+              </span>
+              <span>Care<span className="text-teal-700">verse</span></span>
             </Link>
 
-            {/* Desktop Navigation Links */}
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+              {user ? (
+                <>
+                  <div className="hidden min-w-0 border-r border-slate-200 pr-4 text-right md:block">
+                    <p className="max-w-[12rem] truncate text-sm font-semibold text-navy-950">{user.full_name}</p>
+                    <p className="text-xs capitalize text-slate-600">{user.role}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSosModalOpen(true); setMenuOpen(false); }}
+                    aria-label="Trigger Emergency Assistance"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-rose-700 px-2.5 text-xs font-bold text-white transition-colors hover:bg-rose-800 sm:px-4 sm:text-sm"
+                  >
+                    <ShieldAlert aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    SOS
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-teal-700 px-2.5 text-xs font-bold text-white transition-colors hover:bg-teal-800 sm:px-4 sm:text-sm"
+                >
+                  {t.common.login}
+                </Link>
+              )}
+
+              <button
+                ref={menuButton}
+                type="button"
+                onClick={() => setMenuOpen(open => !open)}
+                aria-label="Menu"
+                aria-controls="careverse-menu"
+                aria-expanded={menuOpen}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-2 text-sm font-semibold text-navy-900 transition-colors hover:bg-slate-100 sm:px-3"
+              >
+                {menuOpen ? <X aria-hidden="true" className="h-5 w-5" /> : <Menu aria-hidden="true" className="h-5 w-5" />}
+                <span className="hidden sm:inline">Menu</span>
+              </button>
+            </div>
+          </div>
+
+          {user && (
+            <nav aria-label="Main navigation" className="hidden flex-wrap items-center gap-1 border-t border-slate-100 py-1.5 lg:flex">
+              {navItems}
+            </nav>
+          )}
+
+          <div
+            id="careverse-menu"
+            aria-label="Careverse menu"
+            hidden={!menuOpen}
+            className="absolute inset-x-3 top-full max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain rounded-b-2xl border border-slate-200 bg-white p-3 shadow-xl sm:left-auto sm:right-6 sm:w-[23rem] sm:p-4 lg:max-h-[calc(100dvh-9rem)]"
+          >
             {user && (
-              <nav className="hidden md:flex items-center gap-1">
-                {navLinks.map((link) => {
-                  const Icon = link.icon;
-                  const isActive = location.pathname === link.to;
-                  return (
-                    <Link
-                      key={link.to}
-                      to={link.to}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
-                        isActive
-                          ? 'bg-teal-50 text-teal-800'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span>{link.label}</span>
-                    </Link>
-                  );
-                })}
+              <nav aria-label="Mobile navigation" className="mb-3 grid grid-cols-1 gap-1 border-b border-slate-200 pb-3 min-[380px]:grid-cols-2 lg:hidden">
+                {navItems}
               </nav>
             )}
-
-            {/* Right Controls */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Accessibility & Language Toolbar */}
-              <A11yToolbar />
-
-              {/* Notification Simulator Trigger (Hackathon evaluator feature) */}
+            <A11yToolbar />
+            <div className="mt-3 grid gap-1.5">
               <button
-                onClick={() => setSimulatorOpen(true)}
-                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold rounded-xl border border-sky-200 transition"
-                title="Open Evaluator Notification Delivery Simulator"
+                type="button"
+                onClick={() => { setSimulatorOpen(true); setMenuOpen(false); }}
+                className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
               >
-                <Mail className="w-3.5 h-3.5 text-sky-600" />
-                <span className="hidden xl:inline">Simulated Inbox</span>
+                <Mail aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
+                Simulated Inbox
               </button>
-
-              {/* Passcode Care Circle Modal Button */}
-              {user && (
-                <button
-                  onClick={() => setPasscodeModalOpen(true)}
-                  className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl border border-amber-200 transition"
-                  title="Passcode Care Circle Joining & Approvals"
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Passcode Circle</span>
-                </button>
-              )}
-
-              {/* Prominent Emergency SOS button */}
-              {user && (
-                <button
-                  onClick={() => setSosModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-black rounded-xl shadow-md transition-transform transform active:scale-95 animate-pulse"
-                  aria-label="Trigger Emergency Assistance"
-                >
-                  <ShieldAlert className="w-4 h-4" />
-                  <span>SOS</span>
-                </button>
-              )}
-
-              {/* User Dropdown / Demo Role Switcher */}
               {user ? (
-                <div className="flex items-center gap-2">
-                  {/* Demo Switcher Quick Buttons */}
-                  <div className="hidden lg:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-[11px] font-semibold text-slate-700">
-                    <span className="px-2 text-slate-400">Switch Demo:</span>
-                    <button
-                      onClick={() => handleRoleSwitch('elderly')}
-                      className={`px-2 py-0.5 rounded-lg ${user.role === 'elderly' ? 'bg-white text-teal-800 shadow-xs' : 'hover:bg-slate-200'}`}
-                    >
-                      Elderly
-                    </button>
-                    <button
-                      onClick={() => handleRoleSwitch('family')}
-                      className={`px-2 py-0.5 rounded-lg ${user.role === 'family' ? 'bg-white text-teal-800 shadow-xs' : 'hover:bg-slate-200'}`}
-                    >
-                      Family
-                    </button>
-                    <button
-                      onClick={() => handleRoleSwitch('caregiver')}
-                      className={`px-2 py-0.5 rounded-lg ${user.role === 'caregiver' ? 'bg-white text-teal-800 shadow-xs' : 'hover:bg-slate-200'}`}
-                    >
-                      Caregiver
-                    </button>
-                    <button
-                      onClick={() => handleRoleSwitch('admin')}
-                      className={`px-2 py-0.5 rounded-lg ${user.role === 'admin' ? 'bg-white text-teal-800 shadow-xs' : 'hover:bg-slate-200'}`}
-                    >
-                      Admin
-                    </button>
-                  </div>
-
-                  <div className="text-right hidden sm:block">
-                    <div className="text-xs font-bold text-slate-900 leading-tight truncate max-w-[120px]">
-                      {user.full_name}
-                    </div>
-                    <div className="text-[10px] font-semibold text-teal-700 capitalize">
-                      {user.role}
-                    </div>
-                  </div>
-
+                <>
                   <button
-                    onClick={logout}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-xl transition"
-                    title={t.common.logout}
-                    aria-label="Log Out"
+                    type="button"
+                    onClick={() => { setPasscodeModalOpen(true); setMenuOpen(false); }}
+                    className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <KeyRound aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
+                    Passcode Circle
                   </button>
-                </div>
+                  <section aria-labelledby="demo-role-label" className="border-y border-slate-200 py-3">
+                    <h2 id="demo-role-label" className="mb-2 px-1 text-sm font-semibold text-slate-700">Demo account</h2>
+                    <div className="grid grid-cols-2 gap-2">
+                      {demoRoles.map(({ role, label }) => (
+                        <button
+                          key={role}
+                          type="button"
+                          onClick={() => void switchDemoRole(role)}
+                          aria-pressed={user.role === role}
+                          disabled={rolePending !== undefined}
+                          className={`min-h-11 rounded-xl border px-2 py-1 text-sm font-semibold disabled:opacity-60 ${
+                            user.role === role ? 'border-teal-200 bg-teal-50 text-teal-900' : 'border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {rolePending === role ? 'Opening…' : label}
+                        </button>
+                      ))}
+                    </div>
+                    {roleError && <p role="alert" className="mt-2 text-sm text-rose-800">{roleError}</p>}
+                  </section>
+                  <button
+                    type="button"
+                    onClick={() => { logout(); setMenuOpen(false); }}
+                    className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    <LogOut aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
+                    {t.common.logout}
+                  </button>
+                </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <Link
-                    to="/login"
-                    className="px-3.5 py-1.5 text-xs sm:text-sm font-bold text-slate-700 hover:text-teal-700 transition"
-                  >
-                    {t.common.login}
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition"
-                  >
-                    {t.common.register}
-                  </Link>
-                </div>
-              )}
-
-              {/* Mobile menu toggle */}
-              {user && (
-                <button
-                  onClick={() => setMobileMenuOpen(prev => !prev)}
-                  className="md:hidden p-2 text-slate-600 hover:text-slate-900 rounded-xl"
-                  aria-label="Toggle mobile menu"
-                >
-                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                </button>
+                <Link to="/register" className="flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">
+                  {t.common.register}
+                </Link>
               )}
             </div>
           </div>
         </div>
-
-        {/* Mobile dropdown menu */}
-        {mobileMenuOpen && user && (
-          <div className="md:hidden bg-white border-t border-slate-200 px-4 pt-3 pb-6 space-y-2">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  <Icon className="w-5 h-5 text-teal-600" />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
-            <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  setSimulatorOpen(true);
-                  setMobileMenuOpen(false);
-                }}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-sky-800 bg-sky-50 rounded-xl"
-              >
-                <Mail className="w-4 h-4 text-sky-600" />
-                Notification Simulator
-              </button>
-            </div>
-          </div>
-        )}
       </header>
 
-      {/* Emergency SOS Modal */}
-      <EmergencySOSModal
-        isOpen={sosModalOpen}
-        onClose={() => setSosModalOpen(false)}
-        patientId={user?.patient_id}
-      />
-
-      {/* Notification Simulator Modal */}
-      <NotificationSimulatorModal
-        isOpen={simulatorOpen}
-        onClose={() => setSimulatorOpen(false)}
-      />
-
-      {/* Passcode Care Circle Modal */}
-      <PasscodeCircleModal
-        isOpen={passcodeModalOpen}
-        onClose={() => setPasscodeModalOpen(false)}
-        patientId={user?.patient_id}
-      />
+      <EmergencySOSModal isOpen={sosModalOpen} onClose={() => setSosModalOpen(false)} patientId={user?.patient_id} />
+      <NotificationSimulatorModal isOpen={simulatorOpen} onClose={() => setSimulatorOpen(false)} />
+      <PasscodeCircleModal isOpen={passcodeModalOpen} onClose={() => setPasscodeModalOpen(false)} patientId={user?.patient_id} />
     </>
   );
 };

@@ -130,10 +130,10 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
                     : 'bg-white border-slate-200'
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-3.5">
+                <div className="flex min-w-0 flex-col justify-between gap-3 xl:flex-row xl:items-center">
+                  <div className="flex min-w-0 items-start gap-2.5 sm:gap-3.5">
                     <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
                         isTaken
                           ? 'bg-emerald-600 text-white'
                           : isDueOrUpcoming
@@ -144,7 +144,7 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
                       <Pill className="w-6 h-6" />
                     </div>
 
-                    <div>
+                    <div className="min-w-0 break-words">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="text-sm font-black text-slate-900">
                           {med?.name || 'Prescribed Medicine'}
@@ -182,13 +182,13 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
 
                   {/* Dose Action Buttons */}
                   {canManageMeds && (
-                    <div className="flex items-center gap-2 self-end sm:self-center mt-2 sm:mt-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 xl:shrink-0">
                       {!isTaken ? (
                         <>
                           <button
                             onClick={() => handleRecordDose(record.id, 'taken', med?.name || 'Medicine')}
                             disabled={loadingDoseId === record.id}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition flex items-center gap-1.5"
+                            className="min-h-11 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition flex items-center gap-1.5"
                           >
                             <CheckCircle className="w-4 h-4" />
                             <span>{loadingDoseId === record.id ? 'Saving...' : t.medications.markTaken}</span>
@@ -196,7 +196,7 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
                           <button
                             onClick={() => handleRecordDose(record.id, 'skipped', med?.name || 'Medicine')}
                             disabled={loadingDoseId === record.id}
-                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
+                            className="min-h-11 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
                           >
                             {t.medications.markSkipped}
                           </button>

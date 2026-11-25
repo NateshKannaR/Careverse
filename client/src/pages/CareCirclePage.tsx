@@ -77,7 +77,7 @@ export const CareCirclePage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
@@ -143,7 +143,7 @@ export const CareCirclePage: React.FC = () => {
           {members.map(member => (
             <div
               key={member.id}
-              className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card flex flex-col justify-between"
+              className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-start justify-between gap-3 mb-4">
@@ -242,7 +242,7 @@ export const CareCirclePage: React.FC = () => {
       )}
 
       {/* Access Audit Transparency Table */}
-      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card">
+      <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
         <h3 className="text-base font-bold text-navy-950 mb-1 flex items-center gap-2">
           <Shield className="w-5 h-5 text-teal-600" />
           <span>Profile Access & Management Audit Trail</span>

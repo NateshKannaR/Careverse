@@ -126,14 +126,14 @@ export const CareBuddyWidget: React.FC<CareBuddyWidgetProps> = ({ patientId, emb
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50">
+      <div className="flex-1 min-h-0 p-3 sm:p-4 overflow-y-auto space-y-4 bg-slate-50/50">
         {messages.map((m) => (
           <div
             key={m.id}
             className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[88%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+              className={`max-w-[88%] break-words p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                 m.sender === 'user'
                   ? 'bg-teal-700 text-white rounded-br-none shadow-sm'
                   : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-card'
@@ -193,8 +193,9 @@ export const CareBuddyWidget: React.FC<CareBuddyWidgetProps> = ({ patientId, emb
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          aria-label="Message CareBuddy"
           placeholder={t.careBuddy.placeholder}
-          className="flex-1 px-4 py-2.5 bg-slate-100 rounded-2xl text-xs sm:text-sm text-slate-800 border-none focus:ring-2 focus:ring-teal-600 focus:outline-none"
+          className="flex-1 min-w-0 px-3 py-2.5 bg-slate-100 rounded-xl text-base text-slate-800 border-none focus:ring-2 focus:ring-teal-600 focus:outline-none"
         />
         <button
           type="submit"
@@ -218,7 +219,7 @@ export const CareBuddyWidget: React.FC<CareBuddyWidgetProps> = ({ patientId, emb
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 bg-teal-700 hover:bg-teal-800 text-white rounded-full shadow-2xl transition-all transform hover:scale-105 border-2 border-white focus:outline-none"
+          className="fixed bottom-3 right-3 z-30 sm:bottom-6 sm:right-6 flex items-center gap-2.5 px-4 py-3 bg-teal-700 hover:bg-teal-800 text-white rounded-full shadow-2xl transition-all transform hover:scale-105 border-2 border-white focus:outline-none"
           aria-label="Open CareBuddy AI Assistant"
         >
           <div className="relative">
@@ -231,7 +232,7 @@ export const CareBuddyWidget: React.FC<CareBuddyWidgetProps> = ({ patientId, emb
 
       {/* Floating window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm sm:max-w-md h-[540px] animate-fade-in">
+        <div className="fixed inset-x-3 bottom-3 z-50 h-[min(34rem,calc(100dvh-1.5rem))] sm:bottom-6 sm:left-auto sm:right-6 sm:w-[28rem] animate-fade-in">
           {widgetContent}
         </div>
       )}

@@ -40,9 +40,9 @@ export const AdminDashboardPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-navy-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-gradient-to-r from-slate-900 via-navy-950 to-slate-900 rounded-3xl p-4 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-teal-400 text-xs font-bold uppercase tracking-wider mb-1">
             <ShieldCheck className="w-4 h-4 text-teal-400" />
@@ -67,8 +67,8 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* System Health Overview Cards */}
       {health && stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">System Status</span>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
@@ -77,7 +77,7 @@ export const AdminDashboardPage: React.FC = () => {
             <span className="text-[10px] text-slate-400 mt-1 block">Uptime: {health.uptimeSeconds}s</span>
           </div>
 
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Active Accounts</span>
             <span className="text-xl font-black text-navy-950 block">{stats.users?.total || 0}</span>
             <span className="text-[10px] text-teal-700 font-semibold mt-1 block">
@@ -85,7 +85,7 @@ export const AdminDashboardPage: React.FC = () => {
             </span>
           </div>
 
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Doses Logged</span>
             <span className="text-xl font-black text-emerald-700 block">{stats.clinical?.totalDosesLogged || 0}</span>
             <span className="text-[10px] text-slate-400 mt-1 block">
@@ -93,7 +93,7 @@ export const AdminDashboardPage: React.FC = () => {
             </span>
           </div>
 
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Notifications</span>
             <span className="text-xl font-black text-sky-700 block">{stats.notifications?.delivered || 0}</span>
             <span className="text-[10px] text-slate-400 mt-1 block">
@@ -104,8 +104,8 @@ export const AdminDashboardPage: React.FC = () => {
       )}
 
       {/* Operational Audit Trail Table */}
-      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card overflow-hidden">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+      <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card overflow-hidden">
+        <div className="flex flex-wrap items-start justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
           <div>
             <h3 className="text-base font-bold text-navy-950 flex items-center gap-2">
               <FileText className="w-5 h-5 text-teal-600" />

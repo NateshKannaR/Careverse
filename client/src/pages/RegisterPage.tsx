@@ -49,8 +49,8 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-card border border-slate-200 my-8">
+    <div className="care-width flex items-center justify-center py-6 sm:py-12">
+      <div className="bg-white rounded-3xl max-w-lg w-full min-w-0 p-4 sm:p-8 shadow-card border border-slate-200 my-8">
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center mx-auto mb-3 shadow-md">
             <Heart className="w-7 h-7 fill-white" />
@@ -131,7 +131,7 @@ export const RegisterPage: React.FC = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Your Primary Role *</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
               <button
                 type="button"
                 onClick={() => setRole('elderly')}

@@ -87,9 +87,9 @@ export const ElderlyDashboardPage: React.FC = () => {
   const nextAppointment = appointments.find(a => a.status === 'scheduled');
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Top Banner: Welcome & Today Date */}
-      <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-navy-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-navy-900 rounded-3xl p-4 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-teal-200 text-xs font-bold uppercase tracking-wider mb-1">
             <Heart className="w-4 h-4 fill-teal-400 text-teal-400" />
@@ -99,7 +99,7 @@ export const ElderlyDashboardPage: React.FC = () => {
             {t.common.welcome}, {user?.full_name}!
           </h1>
           <p className="text-sm sm:text-base text-teal-100/90 font-medium mt-1">
-            {todayFormatted} • Springfield, OR
+            {todayFormatted}
           </p>
         </div>
 
@@ -145,9 +145,9 @@ export const ElderlyDashboardPage: React.FC = () => {
       </div>
 
       {/* Main Grid: Doses & Schedule vs Sidebar Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
         {/* Left 2 Columns: Medication Doses & Timeline */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="min-w-0 lg:col-span-2 space-y-6">
           {/* Next Dose Focus Card */}
           {nextUpcomingDose && (
             <div className="p-5 sm:p-6 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-3xl border-2 border-teal-500/30 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -184,8 +184,8 @@ export const ElderlyDashboardPage: React.FC = () => {
           )}
 
           {/* Today's Medication Timeline */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+          <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6 pb-4 border-b border-slate-100">
               <div>
                 <h2 className="text-lg font-bold text-navy-950">{t.medications.dailySchedule}</h2>
                 <p className="text-xs text-slate-500">
@@ -217,8 +217,8 @@ export const ElderlyDashboardPage: React.FC = () => {
         {/* Right 1 Column: Wellbeing, Appointments, Care Circle, Quick Actions */}
         <div className="space-y-6">
           {/* Daily Wellbeing Check-in Card */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
                 <Smile className="w-5 h-5 text-teal-600" />
                 <h3 className="font-bold text-sm text-navy-950">{t.wellbeing.title}</h3>
@@ -272,8 +272,8 @@ export const ElderlyDashboardPage: React.FC = () => {
           </div>
 
           {/* Next Medical Appointment Card */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-teal-600" />
                 <h3 className="font-bold text-sm text-navy-950">Next Doctor Visit</h3>
@@ -322,8 +322,8 @@ export const ElderlyDashboardPage: React.FC = () => {
           </div>
 
           {/* Care Circle Summary Card */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-teal-600" />
                 <h3 className="font-bold text-sm text-navy-950">{t.careCircle.title}</h3>

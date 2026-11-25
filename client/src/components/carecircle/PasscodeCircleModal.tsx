@@ -145,14 +145,14 @@ export const PasscodeCircleModal: React.FC<PasscodeCircleModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="care-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="passcode-modal-title"
     >
-      <div className="relative w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden text-slate-100">
+      <div className="care-dialog relative max-w-xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-slate-100">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/50">
+        <div className="flex items-center justify-between px-4 py-4 sm:px-6 border-b border-slate-800 bg-slate-950/50">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400">
               <KeyRound className="w-5 h-5" />
@@ -223,14 +223,14 @@ export const PasscodeCircleModal: React.FC<PasscodeCircleModalProps> = ({
 
         {/* Tab 1: Generate Passcode (Elder) */}
         {activeTab === 'invite' && (
-          <div className="p-6 space-y-5">
+          <div className="p-4 sm:p-6 space-y-5">
             <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-4">
               <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
                 <ShieldCheck className="w-4 h-4 text-teal-400" />
                 <span>Create New Secure Passcode</span>
               </h3>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Relationship</label>
                   <input
@@ -321,7 +321,7 @@ export const PasscodeCircleModal: React.FC<PasscodeCircleModalProps> = ({
 
         {/* Tab 2: Join with Passcode */}
         {activeTab === 'join' && (
-          <form onSubmit={handleJoinWithPasscode} className="p-6 space-y-4">
+          <form onSubmit={handleJoinWithPasscode} className="p-4 sm:p-6 space-y-4">
             <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-3">
               <label htmlFor="join-passcode-input" className="block text-sm font-medium text-slate-200">
                 Enter 6-to-8 Character Passcode
@@ -372,7 +372,7 @@ export const PasscodeCircleModal: React.FC<PasscodeCircleModalProps> = ({
 
         {/* Tab 3: Elder Approval Center */}
         {activeTab === 'approvals' && (
-          <div className="p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-4">
             {approvalsLoading ? (
               <p className="text-center text-sm text-slate-400 py-6">Checking pending requests...</p>
             ) : pendingMembers.length === 0 ? (

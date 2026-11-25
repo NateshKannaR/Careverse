@@ -59,3 +59,36 @@ html.high-contrast button {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+@layer components {
+  .care-width {
+    @apply mx-auto w-full max-w-7xl px-3 min-[360px]:px-4 sm:px-6 lg:px-8;
+  }
+
+  .care-page {
+    @apply care-width flex flex-col gap-5 py-5 sm:gap-8 sm:py-8;
+  }
+
+  .care-overlay {
+    @apply fixed inset-0 z-[60] flex items-center justify-center bg-navy-950/70 p-3 backdrop-blur-sm sm:p-6;
+  }
+
+  .care-dialog {
+    @apply my-auto w-full min-w-0 overflow-y-auto overscroll-contain;
+    max-height: calc(100dvh - 1.5rem);
+  }
+}
+
+@media (min-width: 640px) {
+  .care-dialog {
+    max-height: calc(100dvh - 3rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

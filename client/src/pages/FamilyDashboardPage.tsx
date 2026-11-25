@@ -94,9 +94,9 @@ export const FamilyDashboardPage: React.FC = () => {
   const currentPatient = accessiblePatients.find(p => p.id === selectedPatientId);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-navy-900 to-slate-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-gradient-to-r from-navy-900 to-slate-800 rounded-3xl p-4 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-teal-400 text-xs font-bold uppercase tracking-wider mb-1">
             <Users className="w-4 h-4" />
@@ -112,12 +112,13 @@ export const FamilyDashboardPage: React.FC = () => {
 
         {/* Patient Selector */}
         {accessiblePatients.length > 1 && (
-          <div className="bg-white/10 p-3 rounded-2xl border border-white/20">
-            <label className="block text-[11px] font-bold text-teal-200 mb-1">Select Loved One:</label>
+          <div className="w-full min-w-0 rounded-2xl border border-white/20 bg-white/10 p-3 md:max-w-xs">
+            <label htmlFor="family-patient" className="mb-1 block text-xs font-bold text-teal-100">Select loved one</label>
             <select
+              id="family-patient"
               value={selectedPatientId}
               onChange={e => setSelectedPatientId(e.target.value)}
-              className="bg-navy-950 text-white text-xs font-bold px-3 py-2 rounded-xl focus:outline-none"
+              className="min-h-11 w-full min-w-0 rounded-xl bg-navy-950 px-3 py-2 text-sm font-bold text-white"
             >
               {accessiblePatients.map(p => (
                 <option key={p.id} value={p.id}>{p.profile?.full_name || 'Patient'} ({p.relationship})</option>
@@ -128,11 +129,11 @@ export const FamilyDashboardPage: React.FC = () => {
       </div>
 
       {/* Patient Profile Card & Family Daily Digest */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
+        <div className="min-w-0 lg:col-span-2 space-y-6">
           {/* Automated Family Daily Digest */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+          <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-teal-100 text-teal-800 rounded-xl">
                   <Activity className="w-5 h-5" />
@@ -177,7 +178,7 @@ export const FamilyDashboardPage: React.FC = () => {
           </div>
 
           {/* Today's Medication Overview for Family */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card">
+          <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
             <h3 className="font-bold text-base text-navy-950 mb-4 flex items-center gap-2">
               <Pill className="w-5 h-5 text-teal-600" />
               <span>Today's Prescriptions & Dose Records</span>
@@ -226,7 +227,7 @@ export const FamilyDashboardPage: React.FC = () => {
         {/* Right Column: Care Notes & Messages */}
         <div className="space-y-6">
           {/* Send Supportive Care Note */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
             <h3 className="font-bold text-sm text-navy-950 mb-2 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-teal-600" />
               <span>Send Note to Care Circle</span>
@@ -254,7 +255,7 @@ export const FamilyDashboardPage: React.FC = () => {
           </div>
 
           {/* Recent Care Notes Feed */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
             <h3 className="font-bold text-sm text-navy-950 mb-4 flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-600" />
               <span>Recent Care Notes</span>

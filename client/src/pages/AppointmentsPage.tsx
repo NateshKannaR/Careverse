@@ -66,7 +66,7 @@ export const AppointmentsPage: React.FC = () => {
   const pastAppts = appointments.filter(a => a.status !== 'scheduled');
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
@@ -109,7 +109,7 @@ export const AppointmentsPage: React.FC = () => {
             {upcomingAppts.map(appt => (
               <div
                 key={appt.id}
-                className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card flex flex-col justify-between"
+                className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-4">

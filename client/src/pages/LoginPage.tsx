@@ -43,8 +43,8 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4 bg-slate-50">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-card border border-slate-200">
+    <div className="care-width flex items-center justify-center py-6 sm:py-12">
+      <div className="bg-white rounded-3xl max-w-md w-full min-w-0 p-4 sm:p-8 shadow-card border border-slate-200">
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center mx-auto mb-3 shadow-md">
             <Heart className="w-7 h-7 fill-white" />
@@ -57,34 +57,34 @@ export const LoginPage: React.FC = () => {
         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-6">
           <div className="flex items-center gap-1.5 text-xs font-bold text-teal-800 mb-2">
             <UserCheck className="w-4 h-4 text-teal-600" />
-            <span>Instant Demo Logins (Hackathon Evaluators):</span>
+            <span>Try a demo account</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid min-w-0 grid-cols-2 gap-2 text-xs">
             <button
               type="button"
               onClick={() => handleDemo('elderly')}
-              className="p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
+              className="min-h-11 p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
             >
               👵 Eleanor (Patient)
             </button>
             <button
               type="button"
               onClick={() => handleDemo('family')}
-              className="p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
+              className="min-h-11 p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
             >
               👨‍👧 David (Family)
             </button>
             <button
               type="button"
               onClick={() => handleDemo('caregiver')}
-              className="p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
+              className="min-h-11 p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
             >
               👩‍⚕️ Nurse Sarah (Caregiver)
             </button>
             <button
               type="button"
               onClick={() => handleDemo('admin')}
-              className="p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
+              className="min-h-11 p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 rounded-xl font-bold text-slate-800 transition text-center shadow-xs"
             >
               🩺 Dr. Marcus (Admin)
             </button>
@@ -100,31 +100,35 @@ export const LoginPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+            <label htmlFor="login-email" className="block text-sm font-bold text-slate-700 mb-1">Email Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
               <input
+                id="login-email"
                 type="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                className="min-h-11 w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
+            <label htmlFor="login-password" className="block text-sm font-bold text-slate-700 mb-1">Password</label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
               <input
+                id="login-password"
                 type="password"
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                className="min-h-11 w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
               />
             </div>
           </div>

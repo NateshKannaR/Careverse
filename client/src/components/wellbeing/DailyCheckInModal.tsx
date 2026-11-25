@@ -89,10 +89,10 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="wellbeing-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm overflow-y-auto"
+      className="care-overlay"
     >
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 my-8">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
+      <div className="care-dialog bg-white rounded-2xl max-w-lg p-4 sm:p-8 shadow-2xl border border-slate-200">
+        <div className="flex items-start justify-between gap-2 pb-4 border-b border-slate-200 mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-teal-100 text-teal-800 rounded-2xl">
               <Heart className="w-6 h-6 fill-teal-600 text-teal-600" />
@@ -104,7 +104,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
               <p className="text-xs text-slate-500">{t.wellbeing.howAreYouFeeling}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 rounded-xl">
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-11 min-w-11 shrink-0 p-2 text-slate-600 hover:text-slate-700 rounded-xl">
             <X className="w-5 h-5" />
           </button>
         </div>

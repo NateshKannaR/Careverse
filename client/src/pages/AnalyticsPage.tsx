@@ -50,7 +50,7 @@ export const AnalyticsPage: React.FC = () => {
   const COLORS = ['#0d9488', '#059669', '#3b82f6', '#f59e0b', '#8b5cf6'];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
@@ -61,24 +61,24 @@ export const AnalyticsPage: React.FC = () => {
           <p className="text-sm text-slate-500 mt-1">{t.analytics.subtitle}</p>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-auto">
+        <div className="flex w-full flex-wrap items-center gap-2 self-start sm:w-auto sm:self-auto">
           {/* Time range selector */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
+          <div className="inline-flex flex-wrap items-center bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
             <button
               onClick={() => setTimeRange(7)}
-              className={`px-3 py-1.5 rounded-xl transition ${timeRange === 7 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
+              className={`min-h-11 px-2.5 sm:px-3 rounded-lg transition ${timeRange === 7 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
             >
               7 Days
             </button>
             <button
               onClick={() => setTimeRange(14)}
-              className={`px-3 py-1.5 rounded-xl transition ${timeRange === 14 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
+              className={`min-h-11 px-2.5 sm:px-3 rounded-lg transition ${timeRange === 14 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
             >
               14 Days
             </button>
             <button
               onClick={() => setTimeRange(30)}
-              className={`px-3 py-1.5 rounded-xl transition ${timeRange === 30 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
+              className={`min-h-11 px-2.5 sm:px-3 rounded-lg transition ${timeRange === 30 ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600'}`}
             >
               30 Days
             </button>
@@ -88,7 +88,7 @@ export const AnalyticsPage: React.FC = () => {
           <a
             href={api.analytics.getExportUrl(user?.patient_id)}
             download
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold shadow-md transition"
+            className="inline-flex min-h-11 items-center gap-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-bold shadow-md transition"
           >
             <Download className="w-4 h-4" />
             <span>{t.analytics.exportCsv}</span>
@@ -98,28 +98,28 @@ export const AnalyticsPage: React.FC = () => {
 
       {/* Summary KPI Cards */}
       {adherenceData && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+        <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Average Adherence</span>
-            <div className="text-2xl font-black text-teal-700 flex items-center gap-1">
+            <div className="text-xl font-black text-teal-700 sm:text-2xl flex items-center gap-1">
               <span>{adherenceData.averageAdherence == null ? 'No outcomes' : `${adherenceData.averageAdherence}%`}</span>
             </div>
             <span className="text-[10px] text-slate-400 mt-1 block">Recorded outcomes over {timeRange} days</span>
           </div>
 
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Doses Taken</span>
             <span className="text-2xl font-black text-emerald-600 block">{adherenceData.totalTaken}</span>
             <span className="text-[10px] text-slate-400 mt-1 block">Of {adherenceData.totalScheduled} due · {adherenceData.totalPending ?? 0} without an outcome</span>
           </div>
 
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Missed Doses</span>
             <span className="text-2xl font-black text-rose-600 block">{adherenceData.totalMissed}</span>
             <span className="text-[10px] text-slate-400 mt-1 block">{adherenceData.totalSkipped ?? 0} skipped</span>
           </div>
 
-          <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-card">
+          <div className="p-3.5 sm:p-5 bg-white rounded-2xl border border-slate-200 shadow-card">
             <span className="text-xs font-bold text-slate-500 block mb-1">Daily Care Score</span>
             <span className="text-2xl font-black text-navy-950 block">{dailyScore?.score || 0}%</span>
             <span className="text-[10px] text-teal-700 font-semibold mt-1 block">
@@ -130,17 +130,17 @@ export const AnalyticsPage: React.FC = () => {
       )}
 
       {/* Recharts Graphs */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
         {/* Adherence Trend Bar Chart */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+        <div className="min-w-0 lg:col-span-2 bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6 pb-4 border-b border-slate-100">
             <div>
               <h3 className="font-bold text-base text-navy-950">Daily Medication Adherence</h3>
               <p className="text-xs text-slate-500">Due doses by recorded status · {adherenceData?.timeZone ?? 'UTC'}</p>
             </div>
           </div>
 
-          <div className="h-72 w-full">
+          <div className="h-60 w-full min-w-0 sm:h-72">
             {adherenceData?.dailyTrends && (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={adherenceData.dailyTrends}>
@@ -166,12 +166,12 @@ export const AnalyticsPage: React.FC = () => {
         </div>
 
         {/* Prescription Category Breakdown */}
-        <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card flex flex-col justify-between">
+        <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-base text-navy-950 mb-1">Prescription Categories</h3>
             <p className="text-xs text-slate-500 mb-4">Adherence by medical specialty</p>
 
-            <div className="h-56 w-full">
+            <div className="h-52 w-full min-w-0 sm:h-56">
               {adherenceData?.categoryBreakdown && adherenceData.categoryBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>

@@ -67,11 +67,11 @@ export const NotificationSimulatorModal: React.FC<NotificationSimulatorModalProp
       role="dialog"
       aria-modal="true"
       aria-labelledby="simulator-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm"
+      className="care-overlay"
     >
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="care-dialog max-w-4xl rounded-2xl bg-white shadow-2xl border border-slate-200">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 p-3 sm:p-5">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-teal-100 text-teal-800 rounded-xl">
               <Mail className="w-6 h-6" />
@@ -80,7 +80,7 @@ export const NotificationSimulatorModal: React.FC<NotificationSimulatorModalProp
               <h2 id="simulator-title" className="text-lg font-bold text-slate-900">
                 Healthcare Notification Simulator & Delivery Logs
               </h2>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                 <span>Active Provider:</span>
                 <span className="font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
                   {provider}
@@ -149,9 +149,9 @@ export const NotificationSimulatorModal: React.FC<NotificationSimulatorModalProp
         </div>
 
         {/* Content split pane */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-[400px]">
+        <div className="flex min-w-0 flex-col md:flex-row">
           {/* List of dispatched notifications */}
-          <div className="w-full md:w-5/12 border-r border-slate-200 overflow-y-auto p-3 space-y-2 bg-slate-50/50">
+          <div className="max-h-56 w-full md:max-h-[30rem] md:w-5/12 border-b md:border-b-0 md:border-r border-slate-200 overflow-y-auto p-3 space-y-2 bg-slate-50/50">
             {logs.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-xs">
                 No notifications dispatched yet.
@@ -199,7 +199,7 @@ export const NotificationSimulatorModal: React.FC<NotificationSimulatorModalProp
           </div>
 
           {/* Detailed Email Preview */}
-          <div className="flex-1 flex flex-col overflow-y-auto p-5 bg-white">
+          <div className="flex flex-1 min-w-0 flex-col p-3 sm:p-5 bg-white">
             {selectedNotification ? (
               <div>
                 <div className="border-b border-slate-100 pb-4 mb-4">

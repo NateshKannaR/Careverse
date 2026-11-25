@@ -60,12 +60,12 @@ export const EmergencySOSModal: React.FC<EmergencySOSModalProps> = ({ isOpen, on
       role="dialog"
       aria-modal="true"
       aria-labelledby="emergency-dialog-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm animate-fade-in"
+      className="care-overlay animate-fade-in"
     >
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border-4 border-rose-500 relative">
+      <div className="care-dialog relative max-w-lg rounded-2xl border-2 border-rose-500 bg-white p-4 shadow-2xl sm:p-8">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 rounded-full"
+          className="absolute top-2 right-2 min-h-11 min-w-11 p-2 text-slate-600 sm:top-4 sm:right-4 hover:text-slate-700 rounded-full"
           aria-label="Close dialog"
         >
           <X className="w-6 h-6" />
@@ -73,12 +73,12 @@ export const EmergencySOSModal: React.FC<EmergencySOSModalProps> = ({ isOpen, on
 
         {!isTriggered ? (
           <div>
-            <div className="flex items-center gap-3 text-rose-600 mb-4">
-              <div className="p-3 bg-rose-100 rounded-2xl">
+            <div className="flex items-start gap-3 pr-9 text-rose-600 mb-4">
+              <div className="shrink-0 rounded-xl bg-rose-100 p-2.5">
                 <ShieldAlert className="w-8 h-8" />
               </div>
               <div>
-                <h2 id="emergency-dialog-title" className="text-2xl font-bold text-slate-900">
+                <h2 id="emergency-dialog-title" className="text-lg font-bold text-slate-900 sm:text-2xl">
                   {t.emergency.confirmTitle}
                 </h2>
                 <p className="text-xs font-semibold text-rose-700 uppercase tracking-wider">

@@ -1,7 +1,6 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
-import { useLanguage } from '../context/LanguageContext.js';
 import {
   Heart,
   ShieldCheck,
@@ -9,120 +8,110 @@ import {
   Bot,
   Users,
   Calendar,
+  Pill,
   CheckCircle,
   ArrowRight,
   ShieldAlert,
   Clock,
-  Sparkles,
   Lock,
   Activity,
   UserCheck
 } from 'lucide-react';
 import { UserRole } from '../types/index.js';
 
+const demoAccounts = [
+  { role: 'elderly', name: 'Patient', description: 'Track today’s doses', icon: Pill },
+  { role: 'family', name: 'Family', description: 'See the care routine', icon: Users },
+  { role: 'caregiver', name: 'Caregiver', description: 'Review assigned care', icon: Calendar },
+  { role: 'admin', name: 'Admin', description: 'View activity and audit logs', icon: ShieldCheck },
+] as const;
+
 export const LandingPage: React.FC = () => {
   const { demoLogin, user } = useAuth();
-  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const [opening, setOpening] = useState<UserRole>();
+  const [demoError, setDemoError] = useState('');
 
-  const handleDemo = (role: UserRole) => {
-    demoLogin(role);
-  };
+  async function openDemo(role: UserRole) {
+    setOpening(role);
+    setDemoError('');
+    try {
+      await demoLogin(role);
+      navigate('/dashboard');
+    } catch {
+      setDemoError('The demo account could not open. Try again.');
+    } finally {
+      setOpening(undefined);
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-teal-100 selection:text-teal-900">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-12 pb-20 sm:pt-20 sm:pb-28 bg-gradient-to-b from-teal-50/50 via-white to-slate-50 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto">
-            {/* Pill Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold tracking-wide uppercase mb-6 shadow-xs animate-fade-in">
-              <Sparkles className="w-4 h-4 text-teal-600" />
-              <span>Next-Generation Elderly Healthcare Platform</span>
-            </div>
-
-            <h1 className="text-4xl sm:text-6xl font-black text-navy-950 tracking-tight leading-[1.1] mb-6">
-              Your Health. Your Family.{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-600">
-                One Connected Circle.
-              </span>
+    <div className="flex flex-col bg-slate-50 selection:bg-teal-100 selection:text-teal-900">
+      <section className="border-b border-teal-950 bg-[#113d3c] text-white">
+        <div className="care-width grid items-center gap-8 py-10 sm:gap-10 sm:py-16 lg:grid-cols-[1fr_0.9fr] lg:gap-12 lg:py-20">
+          <div className="min-w-0">
+            <h1 className="max-w-[15ch] text-4xl font-black leading-[1.08] tracking-tight sm:text-5xl xl:text-6xl">
+              Everyday care,<br />
+              <span className="text-teal-200">shared with family.</span>
             </h1>
-
-            <p className="text-base sm:text-xl text-slate-600 font-medium leading-relaxed mb-10 max-w-2xl mx-auto">
-              Empowering seniors to maintain independence while keeping family members and caregivers effortlessly aligned through real-time dose tracking, smart reminders, and AI-assisted care intelligence.
+            <p className="mt-5 max-w-[50ch] text-base leading-relaxed text-teal-50 sm:text-lg">
+              Keep medication check-ins, appointments, and family updates together so everyone knows what needs attention.
             </p>
-
-            {/* Evaluator 1-Click Instant Demo Login Banner */}
-            <div className="p-6 bg-white rounded-3xl border-2 border-teal-500/30 shadow-card mb-8 max-w-2xl mx-auto text-left">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-teal-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <UserCheck className="w-4 h-4 text-teal-600" />
-                  Hackathon Evaluator 1-Click Demo Logins
-                </span>
-                <span className="text-[11px] font-semibold text-slate-500">
-                  Pre-configured realistic fictional accounts
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <button
-                  onClick={() => handleDemo('elderly')}
-                  className="py-2.5 px-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-sm transition text-center"
-                >
-                  Elderly Patient
-                </button>
-                <button
-                  onClick={() => handleDemo('family')}
-                  className="py-2.5 px-3 bg-navy-800 hover:bg-navy-900 text-white rounded-xl text-xs font-bold shadow-sm transition text-center"
-                >
-                  Family Member
-                </button>
-                <button
-                  onClick={() => handleDemo('caregiver')}
-                  className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition text-center"
-                >
-                  Nurse / Caregiver
-                </button>
-                <button
-                  onClick={() => handleDemo('admin')}
-                  className="py-2.5 px-3 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition text-center"
-                >
-                  Admin Portal
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link
-                to="/register"
-                className="w-full sm:w-auto px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white text-base font-bold rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 group"
+                to={user ? '/dashboard' : '/register'}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-teal-950 hover:bg-teal-50"
               >
-                <span>Get Started Free</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to="/login"
-                className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-100 text-slate-800 text-base font-bold rounded-2xl border border-slate-200 shadow-sm transition"
-              >
-                Sign In to Account
+                {user ? 'Open dashboard' : 'Create an account'}
+                <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
               </Link>
             </div>
           </div>
+
+          <section aria-labelledby="careverse-demo" className="min-w-0 rounded-2xl border border-teal-100 bg-white p-4 text-navy-950 shadow-card sm:rounded-3xl sm:p-6">
+            <div className="flex items-start gap-3">
+              <UserCheck aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
+              <div className="min-w-0">
+                <h2 id="careverse-demo" className="text-lg font-bold sm:text-xl">Explore the demo</h2>
+                <p className="mt-1 text-sm text-slate-600">Choose a role to open a fictional account.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2.5 min-[380px]:grid-cols-2">
+              {demoAccounts.map(({ role, name, description, icon: Icon }) => (
+                <button
+                  key={role}
+                  type="button"
+                  disabled={opening !== undefined}
+                  onClick={() => void openDemo(role)}
+                  className="group flex min-h-14 min-w-0 items-start gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 text-left hover:border-teal-400 hover:bg-teal-50 disabled:opacity-60 sm:p-3"
+                >
+                  <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold">{opening === role ? 'Opening…' : name}</span>
+                    <span className="mt-0.5 block text-xs leading-snug text-slate-600">{description}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            {demoError && <p role="alert" className="mt-3 text-sm text-rose-800">{demoError}</p>}
+          </section>
         </div>
       </section>
 
       {/* Core Ecosystem Value Pillars */}
-      <section className="py-16 sm:py-24 bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl font-extrabold text-navy-950 tracking-tight mb-3">
-              Designed Centered Around the Elderly Individual
+      <section className="py-10 sm:py-16 bg-white border-b border-slate-200">
+        <div className="care-width">
+          <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-950 tracking-tight mb-3">
+              Tools for everyone in the care circle
             </h2>
             <p className="text-slate-600 text-sm sm:text-base">
               CAREVERSE combines simplicity for seniors with comprehensive coordination tools for their circle of support.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 bg-slate-50 rounded-3xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+            <div className="p-5 sm:p-7 bg-slate-50 rounded-2xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
               <div className="w-14 h-14 rounded-2xl bg-teal-100 text-teal-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Clock className="w-7 h-7" />
               </div>
@@ -140,7 +129,7 @@ export const LandingPage: React.FC = () => {
               </ul>
             </div>
 
-            <div className="p-8 bg-slate-50 rounded-3xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
+            <div className="p-5 sm:p-7 bg-slate-50 rounded-2xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
               <div className="w-14 h-14 rounded-2xl bg-sky-100 text-sky-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Users className="w-7 h-7" />
               </div>
@@ -158,7 +147,7 @@ export const LandingPage: React.FC = () => {
               </ul>
             </div>
 
-            <div className="p-8 bg-slate-50 rounded-3xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
+            <div className="p-5 sm:p-7 bg-slate-50 rounded-2xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
               <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Bot className="w-7 h-7" />
               </div>
@@ -180,12 +169,12 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Security & Accessibility Section */}
-      <section className="py-16 sm:py-24 bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <section className="py-10 sm:py-16 bg-slate-900 text-white">
+        <div className="care-width">
+          <div className="grid min-w-0 grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-bold uppercase tracking-wider mb-4">
-                <Lock className="w-4 h-4 text-teal-400" /> Security & Privacy First
+                <Lock className="w-4 h-4 text-teal-400" /> Privacy and accessibility
               </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
                 Engineered for Healthcare Privacy & Accessibility
@@ -219,7 +208,7 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-slate-800/80 p-8 rounded-3xl border border-slate-700 shadow-2xl">
+            <div className="bg-slate-800/80 p-5 sm:p-8 rounded-2xl border border-slate-700 shadow-2xl">
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                 <BellRing className="w-5 h-5 text-teal-400" />
                 Notification Engine Highlights
@@ -242,11 +231,10 @@ export const LandingPage: React.FC = () => {
 
       {/* Footer */}
       <footer className="mt-auto bg-white border-t border-slate-200 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="care-width flex flex-col items-start justify-between gap-4 text-xs text-slate-600 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <Heart className="w-4 h-4 text-teal-600 fill-teal-600" />
             <span className="font-bold text-slate-800">CAREVERSE Ecosystem</span>
-            <span>• Hackathon Submission Edition</span>
           </div>
           <div>
             Built with React, TypeScript, Tailwind CSS, Express, and Supabase PostgreSQL.

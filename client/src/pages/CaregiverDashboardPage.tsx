@@ -104,9 +104,9 @@ export const CaregiverDashboardPage: React.FC = () => {
   const activePatient = patients.find(p => p.id === selectedPatientId);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Caregiver Header */}
-      <div className="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-3xl p-4 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">
             <Heart className="w-4 h-4 fill-emerald-300" />
@@ -121,25 +121,31 @@ export const CaregiverDashboardPage: React.FC = () => {
         </div>
 
         {/* Assigned Patients Picker */}
-        <div className="bg-white/10 p-3 rounded-2xl border border-white/20">
-          <label className="block text-[11px] font-bold text-emerald-200 mb-1">Current Patient:</label>
+        <div className="w-full min-w-0 rounded-2xl border border-white/20 bg-white/10 p-3 md:max-w-xs">
+          <label htmlFor="caregiver-patient" className="mb-1 block text-xs font-bold text-emerald-100">Current patient</label>
           <select
+            id="caregiver-patient"
             value={selectedPatientId}
             onChange={e => setSelectedPatientId(e.target.value)}
-            className="bg-emerald-950 text-white text-xs font-bold px-3 py-2 rounded-xl focus:outline-none"
+            className="min-h-11 w-full min-w-0 rounded-xl bg-emerald-950 px-3 py-2 text-sm font-bold text-white"
           >
             {patients.map(p => (
               <option key={p.id} value={p.id}>
-                {p.profile?.full_name || 'Patient'} (Allergies: {p.allergies?.join(', ') || 'None'})
+                {p.profile?.full_name || 'Patient'}
               </option>
             ))}
           </select>
+          {activePatient && (
+            <p className="mt-2 break-words text-xs text-emerald-50">
+              Allergies: {activePatient.allergies?.join(', ') || 'None recorded'}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Main Grid: Pending Doses, Missed Alerts, and Care Notes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
+        <div className="min-w-0 lg:col-span-2 space-y-6">
           {/* Missed Doses Alert Banner (if any) */}
           {missedDoses.length > 0 && (
             <div className="p-5 bg-rose-50 border-2 border-rose-300 rounded-3xl text-xs text-rose-900 shadow-sm">
@@ -167,7 +173,7 @@ export const CaregiverDashboardPage: React.FC = () => {
           )}
 
           {/* Pending Medication Administration Doses */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card">
+          <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
             <h3 className="text-lg font-bold text-navy-950 mb-1 flex items-center gap-2">
               <Pill className="w-5 h-5 text-teal-600" />
               <span>Pending Doses for Today ({pendingDoses.length})</span>
@@ -225,7 +231,7 @@ export const CaregiverDashboardPage: React.FC = () => {
 
         {/* Right Column: Add Clinical / Vitals Care Note */}
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card">
+          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
             <h3 className="font-bold text-sm text-navy-950 mb-1 flex items-center gap-2">
               <FilePlus className="w-4 h-4 text-teal-600" />
               <span>Record Clinical Care Note / Vitals</span>

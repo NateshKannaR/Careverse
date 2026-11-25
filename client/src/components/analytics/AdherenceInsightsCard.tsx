@@ -55,7 +55,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
 
   if (loading) {
     return (
-      <div className={`p-6 rounded-2xl bg-slate-900/60 border border-slate-800 animate-pulse ${className}`}>
+      <div className={`p-4 sm:p-6 rounded-2xl bg-slate-900/60 border border-slate-800 animate-pulse ${className}`}>
         <div className="h-5 w-44 bg-slate-800 rounded mb-4"></div>
         <div className="h-20 bg-slate-800/60 rounded-xl"></div>
       </div>
@@ -64,7 +64,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
 
   if (error) {
     return (
-      <p role="alert" className={`p-6 rounded-2xl bg-slate-900 border border-slate-800 text-sm text-slate-200 ${className}`}>
+      <p role="alert" className={`p-4 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 text-sm text-slate-200 ${className}`}>
         Could not load adherence records.
       </p>
     );
@@ -72,7 +72,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
 
   if (!insight || !insight.has_data) {
     return (
-      <div className={`p-6 rounded-2xl bg-slate-900/80 border border-slate-800 text-center py-8 ${className}`}>
+      <div className={`p-4 sm:p-6 rounded-2xl bg-slate-900/80 border border-slate-800 text-center py-8 ${className}`}>
         <p className="text-sm font-semibold text-slate-300">No Adherence Data Yet</p>
         <p className="text-xs text-slate-500 mt-1">Log dose outcomes to see adherence and recurring patterns.</p>
       </div>
@@ -80,9 +80,9 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
   }
 
   return (
-    <div className={`p-6 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-5 ${className}`}>
+    <div className={`p-4 sm:p-6 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-5 ${className}`}>
       {/* Header with KPI highlights */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-base font-bold text-white flex items-center space-x-2">
             <span>Adherence insights</span>
@@ -98,22 +98,22 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
+      <div className="grid grid-cols-2 gap-2 min-[390px]:grid-cols-3 sm:gap-3">
+        <div className="min-w-0 p-2.5 sm:p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
           <p className="text-xs text-slate-400">7-Day Adherence</p>
-          <p className="text-xl font-bold text-teal-400 mt-1">
+          <p className="break-words text-base font-bold text-teal-300 sm:text-xl mt-1">
             {insight.weekly_adherence_rate == null ? 'No outcomes' : `${insight.weekly_adherence_rate}%`}
           </p>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
+        <div className="min-w-0 p-2.5 sm:p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
           <p className="text-xs text-slate-400">Doses Taken</p>
           <p className="text-xl font-bold text-emerald-400 mt-1">
-            {insight.total_taken_week} <span className="text-xs text-slate-500 font-normal">/ {insight.total_scheduled_week}</span>
+            {insight.total_taken_week} <span className="text-xs text-slate-400 font-normal">/ {insight.total_scheduled_week}</span>
           </p>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
+        <div className="min-w-0 p-2.5 sm:p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-center">
           <p className="text-xs text-slate-400">Missed or Skipped</p>
           <p className={`text-xl font-bold mt-1 ${insight.total_missed_week > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
             {insight.total_missed_week}
@@ -139,11 +139,11 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
               key={idx}
               className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-2.5"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
                   {pat.slot_name} Slot ({pat.time_window})
                 </span>
-                <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-rose-500/20 text-rose-200 border border-rose-500/30">
                   {pat.missed_count} of {pat.total_scheduled} recorded missed or skipped ({pat.missed_percentage}%)
                 </span>
               </div>
@@ -153,7 +153,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
                 <p className="leading-relaxed">{pat.suggestion}</p>
               </div>
 
-              <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between">
+              <div className="pt-2 border-t border-amber-500/20 flex flex-wrap items-start justify-between gap-2">
                 <span className="text-[11px] text-slate-400 flex items-center space-x-1">
                   <Sparkles className="w-3 h-3 text-teal-400" />
                   <span>Habit Cue Recommendation</span>
@@ -161,7 +161,7 @@ export const AdherenceInsightsCard: React.FC<AdherenceInsightsCardProps> = ({
                 <button
                   onClick={() => handleSpeakSuggestion(pat.suggestion)}
                   disabled={speaking}
-                  className="py-1 px-2.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-xs font-semibold transition flex items-center space-x-1"
+                  className="min-h-11 px-2.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-xs font-semibold transition flex items-center space-x-1"
                 >
                   <Volume2 className="w-3.5 h-3.5" />
                   <span>Read Aloud</span>

@@ -83,7 +83,7 @@ export const MedicationsPage: React.FC = () => {
   const categories = ['All', ...Array.from(new Set(medications.map(m => m.category)))];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+    <div className="care-page animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
@@ -123,33 +123,33 @@ export const MedicationsPage: React.FC = () => {
       )}
 
       {/* View Toggle Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="grid grid-cols-2 gap-1 border-b border-slate-200 sm:flex sm:items-center sm:gap-2">
         <button
           onClick={() => setActiveTab('timeline')}
-          className={`pb-3 px-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+          className={`min-h-11 min-w-0 px-2 py-2 text-left text-sm font-bold border-b-2 transition flex items-center gap-2 sm:px-4 ${
             activeTab === 'timeline'
               ? 'border-teal-600 text-teal-800'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Clock className="w-4 h-4" />
-          <span>{t.medications.dailySchedule}</span>
+          <Clock aria-hidden="true" className="w-4 h-4 shrink-0" />
+          <span className="min-w-0 break-words">{t.medications.dailySchedule}</span>
         </button>
         <button
           onClick={() => setActiveTab('all')}
-          className={`pb-3 px-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+          className={`min-h-11 min-w-0 px-2 py-2 text-left text-sm font-bold border-b-2 transition flex items-center gap-2 sm:px-4 ${
             activeTab === 'all'
               ? 'border-teal-600 text-teal-800'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>{t.medications.allPrescriptions} ({medications.length})</span>
+          <Layers aria-hidden="true" className="w-4 h-4 shrink-0" />
+          <span className="min-w-0 break-words">{t.medications.allPrescriptions} ({medications.length})</span>
         </button>
       </div>
 
       {activeTab === 'timeline' ? (
-        <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-card">
+        <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
           <DoseTimeline records={todayDoses} onDoseUpdated={fetchMedications} canManageMeds={true} />
         </div>
       ) : (
@@ -167,7 +167,7 @@ export const MedicationsPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 sm:min-w-0">
               {categories.map(cat => (
                 <button
                   key={cat}
