@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/storageAdapter.js';
+import { ReminderEngine } from '../services/reminderEngine.js';
 import { config } from '../config/index.js';
 
 const router = Router();
@@ -13,7 +14,7 @@ router.get('/health', (req: Request, res: Response): void => {
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
     database: 'healthy',
-    reminderEngine: 'active',
+    reminderEngine: ReminderEngine.active ? 'active' : 'on-demand',
     notificationProvider: config.resendApiKey ? 'Resend (Production)' : 'Simulator (Development)',
     environment: config.nodeEnv
   });
@@ -34,8 +35,8 @@ router.get('/stats', (req: Request, res: Response): void => {
   let totalMeds = 0;
   let totalDosesRecorded = 0;
   patients.forEach(p => {
-    totalMeds += db.getMedications(p.id).length;
-    totalDosesRecorded += db.getAdministrationRecords(p.id).length;
+    totalMeds += db.getMedications(p.id, true).length;
+    totalDosesRecorded += db.getAdministrationRecords(p.id).filter(dose => ['taken', 'missed', 'skipped'].includes(dose.status)).length;
   });
 
   res.json({

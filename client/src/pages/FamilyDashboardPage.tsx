@@ -1,5 +1,6 @@
 import type { DailyCareScore } from '../types/index.js';
 import { formatDoseTime } from '../utils/doseTime.js';
+import { useQuery } from '@tanstack/react-query';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
@@ -24,17 +25,10 @@ import {
 export const FamilyDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [doseTimeZone, setDoseTimeZone] = useState<string>();
-
   const [accessiblePatients, setAccessiblePatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  const [doses, setDoses] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [careNotes, setCareNotes] = useState<any[]>([]);
-  const [familyDigest, setFamilyDigest] = useState<string>('');
-  const [careScore, setCareScore] = useState<DailyCareScore | null>(null);
   const [newNote, setNewNote] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     api.patients.getAccessible().then(res => {
@@ -46,42 +40,29 @@ export const FamilyDashboardPage: React.FC = () => {
     }).catch(console.error);
   }, []);
 
-  const fetchPatientData = async (patientId: string) => {
-    if (!patientId) return;
-    setLoading(true);
-    try {
-      const [dosesRes, apptsRes, notesRes, digestRes, scoreRes] = await Promise.all([
-        api.medications.getTodayDoses(patientId),
-        api.appointments.getAll(patientId),
-        api.careNotes.getAll(patientId),
-        api.careBuddy.getDigest(patientId),
-        api.analytics.getDailyScore(patientId)
+  const details = useQuery({
+    queryKey: ['family-care-plan', user?.id, selectedPatientId],
+    enabled: Boolean(selectedPatientId),
+    staleTime: 0,
+    queryFn: async () => {
+      const [timeline, notes, visits, digest, report] = await Promise.all([
+        api.medications.getTodayDoses(selectedPatientId), api.careNotes.getAll(selectedPatientId),
+        api.appointments.getAll(selectedPatientId), api.careBuddy.getDigest(selectedPatientId), api.analytics.getDailyScore(selectedPatientId),
       ]);
-
-      if (dosesRes) {
-        setDoses(dosesRes.records || []);
-        setDoseTimeZone(dosesRes.time_zone);
-      }
-      if (apptsRes) setAppointments(apptsRes.appointments || []);
-      if (notesRes) setCareNotes(notesRes.notes || []);
-      if (digestRes) setFamilyDigest(digestRes.digest || '');
-      if (scoreRes) setCareScore(scoreRes.score);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedPatientId) {
-      fetchPatientData(selectedPatientId);
-    }
-  }, [selectedPatientId]);
+      return { timeline, notes, visits, digest, report };
+    },
+  });
+  const doses: any[] = details.data?.timeline.records ?? [];
+  const doseTimeZone: string | undefined = details.data?.timeline.time_zone;
+  const careNotes: any[] = details.data?.notes.notes ?? [];
+  const appointments = details.data?.visits.appointments ?? [];
+  const familyDigest = details.data?.digest.digest ?? '';
+  const careScore = details.data?.report.score;
 
   const handleSendNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNote.trim() || !selectedPatientId) return;
+    setSending(true);
     try {
       await api.careNotes.create({
         patient_id: selectedPatientId,
@@ -91,10 +72,10 @@ export const FamilyDashboardPage: React.FC = () => {
         is_priority: false
       });
       setNewNote('');
-      fetchPatientData(selectedPatientId);
+      await details.refetch();
     } catch (err: any) {
       alert(err.message || 'Failed to send note');
-    }
+    } finally { setSending(false); }
   };
 
   const currentPatient = accessiblePatients.find(p => p.id === selectedPatientId);
@@ -123,7 +104,7 @@ export const FamilyDashboardPage: React.FC = () => {
             <select
               id="family-patient"
               value={selectedPatientId}
-              onChange={e => setSelectedPatientId(e.target.value)}
+              onChange={e => { setSelectedPatientId(e.target.value); setNewNote(''); }}
               className="min-h-11 w-full min-w-0 rounded-xl bg-navy-950 px-3 py-2 text-sm font-bold text-white"
             >
               {accessiblePatients.map(p => (
@@ -135,7 +116,9 @@ export const FamilyDashboardPage: React.FC = () => {
       </div>
 
       {/* Patient Profile Card & Family Daily Digest */}
-      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
+      {details.isError && <p role="alert">Unable to load this patient’s care plan. <button className="font-semibold underline" onClick={() => details.refetch()}>Retry</button></p>}
+      {selectedPatientId && details.isPending && <p role="status">Loading care plan…</p>}
+      {details.data && <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
         <div className="min-w-0 lg:col-span-2 space-y-6">
           {/* Automated Family Daily Digest */}
           <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
@@ -170,13 +153,13 @@ export const FamilyDashboardPage: React.FC = () => {
               </div>
               <div className="p-3 bg-sky-50 rounded-2xl border border-sky-100">
                 <span className="block text-xl font-black text-sky-700">
-                  {doses.filter(d => d.status === 'upcoming' || d.status === 'due_now').length}
+                  {careScore?.metrics.upcomingDoses ?? '—'}
                 </span>
                 <span className="text-[11px] font-bold text-sky-900 uppercase">Upcoming Today</span>
               </div>
               <div className="p-3 bg-slate-100 rounded-2xl border border-slate-200">
                 <span className="block text-xl font-black text-slate-800">
-                  {appointments.filter(a => a.status === 'scheduled').length}
+                  {appointments.filter(a => a.is_upcoming).length}
                 </span>
                 <span className="text-[11px] font-bold text-slate-700 uppercase">Upcoming Visits</span>
               </div>
@@ -227,13 +210,13 @@ export const FamilyDashboardPage: React.FC = () => {
           {selectedPatientId && <AdherenceInsightsCard key={selectedPatientId} patientId={selectedPatientId} />}
 
           {/* Days-to-Depletion Refill Forecast Widget */}
-          {selectedPatientId && <RefillPredictionWidget patientId={selectedPatientId} />}
+          {selectedPatientId && <RefillPredictionWidget key={selectedPatientId} patientId={selectedPatientId} />}
         </div>
 
         {/* Right Column: Care Notes & Messages */}
         <div className="space-y-6">
           {/* Send Supportive Care Note */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
+          {currentPatient?.permissions?.can_add_notes && <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
             <h3 className="font-bold text-sm text-navy-950 mb-2 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-teal-600" />
               <span>Send Note to Care Circle</span>
@@ -251,14 +234,14 @@ export const FamilyDashboardPage: React.FC = () => {
               />
               <button
                 type="submit"
-                disabled={!newNote.trim()}
+                disabled={sending || !newNote.trim()}
                 className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Post Note</span>
               </button>
             </form>
-          </div>
+          </div>}
 
           {/* Recent Care Notes Feed */}
           <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
@@ -285,9 +268,9 @@ export const FamilyDashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
-      <CareBuddyWidget patientId={selectedPatientId} />
+      {selectedPatientId && <CareBuddyWidget key={selectedPatientId} patientId={selectedPatientId} />}
     </div>
   );
 };

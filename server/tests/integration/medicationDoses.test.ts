@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { app } from '../../src/server.js';
 import { db } from '../../src/db/storageAdapter.js';
@@ -9,6 +9,8 @@ describe('Medication & Dose Tracking Integration Tests', () => {
   let caregiverToken: string;
 
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-25T18:00:00Z'));
     db.seedInitialData();
 
     const elderlyLogin = await request(app).post('/api/auth/demo-login').send({ role: 'elderly' });
@@ -18,6 +20,8 @@ describe('Medication & Dose Tracking Integration Tests', () => {
     const caregiverLogin = await request(app).post('/api/auth/demo-login').send({ role: 'caregiver' });
     caregiverToken = caregiverLogin.body.token;
   });
+
+  afterEach(() => vi.useRealTimers());
 
   it('should list medications for authenticated elderly user', async () => {
     const res = await request(app)

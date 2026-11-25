@@ -14,14 +14,14 @@ export const EmergencySOSModal: React.FC<EmergencySOSModalProps> = ({ isOpen, on
   const { t } = useLanguage();
   const { speakAnnouncement } = useA11y();
   const [isTriggered, setIsTriggered] = useState(false);
-  const [countdown, setCountdown] = useState(5);
+  const [delivery, setDelivery] = useState({ sent: 0, simulated: 0, failed: 0, pending: 0 });
   const [loading, setLoading] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       setIsTriggered(false);
-      setCountdown(5);
+      setContacts([]);
       api.emergency.getContacts(patientId).then(res => {
         if (res.contacts) setContacts(res.contacts);
       }).catch(console.error);
@@ -32,9 +32,10 @@ export const EmergencySOSModal: React.FC<EmergencySOSModalProps> = ({ isOpen, on
 
   const handleConfirmSOS = async () => {
     setLoading(true);
-    speakAnnouncement('Emergency SOS activated. Alerting Care Circle now.');
     try {
-      await api.emergency.triggerSos(patientId);
+      const result = await api.emergency.triggerSos(patientId);
+      setDelivery(result.delivery);
+      speakAnnouncement('SOS activation recorded. Review the delivery status.');
       setIsTriggered(true);
     } catch (err: any) {
       alert(err.message || 'Failed to trigger SOS alert');
@@ -50,8 +51,7 @@ export const EmergencySOSModal: React.FC<EmergencySOSModalProps> = ({ isOpen, on
       setIsTriggered(false);
       onClose();
     } catch (err: any) {
-      console.error(err);
-      onClose();
+      alert('The cancellation could not be recorded. Try again.');
     }
   };
 
@@ -103,13 +103,13 @@ export const EmergencySOSModal: React.FC<EmergencySOSModalProps> = ({ isOpen, on
                 <strong className="underline text-sm font-black">112</strong> (Europe/India), or{' '}
                 <strong className="underline text-sm font-black">999</strong> (UK).
               </p>
-              <div className="mt-3 flex gap-2">
-                <a
-                  href="tel:911"
+              <div className="mt-3 flex flex-wrap gap-2">
+                {['911', '112', '999'].map(number => <a key={number}
+                  href={'tel:' + number}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow hover:bg-rose-700 transition"
                 >
-                  <PhoneCall className="w-3.5 h-3.5" /> Call 911 / 112
-                </a>
+                  <PhoneCall className="w-3.5 h-3.5" /> Call {number}
+                </a>)}
               </div>
             </div>
 
@@ -135,15 +135,15 @@ export const EmergencySOSModal: React.FC<EmergencySOSModalProps> = ({ isOpen, on
               <CheckCircle2 className="w-10 h-10" />
             </div>
             <h3 className="text-2xl font-bold text-slate-900 mb-2">
-              Alerts Dispatched!
+              SOS activation recorded
             </h3>
             <p className="text-sm text-slate-600 mb-6">
-              Your active Care Circle members and designated emergency contacts have been notified with your address and conditions.
+              Care Circle email status · {delivery.sent} accepted by provider · {delivery.simulated} simulated · {delivery.failed} failed · {delivery.pending} pending.
             </p>
 
             {contacts.length > 0 && (
               <div className="text-left bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
-                <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Emergency Contacts Contacted:</h4>
+                <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Contacts you can call</h4>
                 <ul className="space-y-1.5 text-xs text-slate-700">
                   {contacts.map((c, idx) => (
                     <li key={idx} className="flex justify-between items-center py-1 border-b border-slate-100 last:border-none">

@@ -1,3 +1,4 @@
+import { visitSchedule } from './patientSchedule.js';
 import { db } from '../db/storageAdapter.js';
 import { CareScoreService } from './careScoreService.js';
 const MEDICAL_DISCLAIMER = 'IMPORTANT MEDICAL DISCLAIMER: CareBuddy is an AI routine support assistant and does NOT provide medical advice, diagnosis, dosage adjustments, or emergency triage. Always consult your doctor, pharmacist, or dial emergency services (911 / 112) for clinical concerns.';
@@ -10,11 +11,7 @@ function scoreSummary(careScore) {
         : `${careScore.score}% (${careScore.metrics.completedItems} of ${careScore.metrics.routineItems} routine items completed)`;
 }
 function upcomingAppointments(patientId, score, now) {
-    const time = new Intl.DateTimeFormat('en-GB', {
-        timeZone: score.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-    }).format(now);
-    return db.getAppointments(patientId).filter(appointment => appointment.status === 'scheduled' && (appointment.appointment_date > score.date
-        || (appointment.appointment_date === score.date && appointment.appointment_time >= time))).sort((a, b) => `${a.appointment_date}T${a.appointment_time}`.localeCompare(`${b.appointment_date}T${b.appointment_time}`));
+    return visitSchedule(db.getAppointments(patientId), score.timeZone, now).filter(visit => visit.is_upcoming);
 }
 export class CareBuddyService {
     /**

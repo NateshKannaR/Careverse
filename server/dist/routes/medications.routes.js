@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
-import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
+import { checkPatientAccess, verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { predictAllRefills } from '../services/refillService.js';
-import { getDailyDoseEvidence } from '../services/adherencePatternService.js';
+import { getDailyDoseEvidence, getPatientDate } from '../services/adherencePatternService.js';
 const router = Router();
 router.use(authenticateJwt);
 const medicationSchema = z.object({
@@ -15,7 +15,7 @@ const medicationSchema = z.object({
     dosage: z.string().min(1, 'Dosage is required (e.g., 1 Tablet)'),
     strength: z.string().optional(),
     frequency: z.string().min(1, 'Frequency is required'),
-    times_of_day: z.array(z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Time must be HH:MM format')).min(1, 'At least one time of day required'),
+    times_of_day: z.array(z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Time must be HH:MM format')),
     instructions: z.string().optional(),
     prescribing_doctor: z.string().optional(),
     pharmacy: z.string().optional(),
@@ -53,17 +53,8 @@ router.get('/', (req, res) => {
         res.status(400).json({ error: 'Patient ID is required.' });
         return;
     }
-    // Authorization check
-    if (req.user?.role !== 'admin') {
-        if (req.user?.role === 'elderly' && req.user.patient_id !== patientId) {
-            res.status(403).json({ error: 'Access denied.' });
-            return;
-        }
-        if ((req.user?.role === 'family' || req.user?.role === 'caregiver') && !db.isMemberOfPatientCareCircle(patientId, req.user.id)) {
-            res.status(403).json({ error: 'Access denied. You are not a member of this Care Circle.' });
-            return;
-        }
-    }
+    if (!verifyPatientAccess(req, res, patientId, 'view'))
+        return;
     const activeOnly = req.query.active === 'true';
     const search = (req.query.search || '').toLowerCase();
     let medications = db.getMedications(patientId, activeOnly);
@@ -72,7 +63,7 @@ router.get('/', (req, res) => {
             m.category.toLowerCase().includes(search) ||
             (m.prescribing_doctor && m.prescribing_doctor.toLowerCase().includes(search)));
     }
-    res.json({ medications });
+    res.json({ medications, can_manage: checkPatientAccess(req.user, patientId, 'manage_meds').allowed });
 });
 // POST /api/medications - add medication
 router.post('/', (req, res) => {
@@ -86,26 +77,20 @@ router.post('/', (req, res) => {
         res.status(400).json({ error: 'Patient ID is required.' });
         return;
     }
-    // Check manage_meds permission
-    if (req.user?.role !== 'admin') {
-        if (req.user?.role === 'elderly' && req.user.patient_id !== patientId) {
-            res.status(403).json({ error: 'Access denied.' });
-            return;
-        }
-        if (req.user?.role === 'family' || req.user?.role === 'caregiver') {
-            const member = db.getCareCircleMember(patientId, req.user.id);
-            if (!member || !member.can_manage_meds) {
-                res.status(403).json({ error: 'Access denied. You do not have permission to manage medications for this patient.' });
-                return;
-            }
-        }
-    }
+    if (!verifyPatientAccess(req, res, patientId, 'manage_meds'))
+        return;
     const newMedication = {
         ...parsed.data,
         id: uuidv4(),
         patient_id: patientId,
         created_at: new Date().toISOString()
     };
+    if (newMedication.frequency.toLowerCase() === 'as needed')
+        newMedication.times_of_day = [];
+    else if (!newMedication.times_of_day.length || new Set(newMedication.times_of_day).size !== newMedication.times_of_day.length) {
+        res.status(400).json({ error: 'Enter distinct scheduled times for this prescription.' });
+        return;
+    }
     const created = db.createMedication(newMedication);
     db.logAudit({
         actor_id: req.user?.id,
@@ -127,12 +112,44 @@ router.get('/refills/forecast', (req, res) => {
     if (!verifyPatientAccess(req, res, patientId, 'view'))
         return;
     const medications = db.getMedications(patientId, true);
-    const forecast = predictAllRefills(medications);
+    const today = getPatientDate(new Date(), db.getPatientTimeZone(patientId));
+    const notes = new Set(db.getCareNotes(patientId).map(note => note.id));
+    const forecast = predictAllRefills(medications).map(item => ({
+        ...item, shared_today: notes.has(`refill-${item.medication_id}-${today}`),
+    }));
     res.json({
         forecast,
+        can_share: checkPatientAccess(req.user, patientId, 'add_notes').allowed,
         urgent_count: forecast.filter(f => f.needs_urgent_refill).length,
         low_stock_count: forecast.filter(f => f.is_low_stock).length
     });
+});
+// Keep one refill handoff per prescription per patient-local day, including retries.
+router.post('/:id/refill-note', (req, res) => {
+    const med = db.getMedicationById(req.params.id);
+    if (!med || med.archived_at) {
+        res.status(404).json({ error: 'Prescription not found.' });
+        return;
+    }
+    if (!verifyPatientAccess(req, res, med.patient_id, 'add_notes'))
+        return;
+    if (!med.is_active) {
+        res.status(409).json({ error: 'This prescription is paused.' });
+        return;
+    }
+    const now = new Date();
+    const date = getPatientDate(now, db.getPatientTimeZone(med.patient_id));
+    const id = `refill-${med.id}-${date}`;
+    const existing = db.getCareNotes(med.patient_id).some(note => note.id === id);
+    if (!existing) {
+        db.createCareNote({
+            id, patient_id: med.patient_id, author_id: req.user.id, category: 'medical',
+            title: `Refill follow-up · ${med.name}`, is_priority: true, created_at: now.toISOString(),
+            content: `Please coordinate the next refill with ${med.pharmacy || 'the pharmacy'}. Remaining supply on file: ${med.remaining_supply ?? 'unknown'} doses.`,
+        });
+        db.logAudit({ actor_id: req.user.id, patient_id: med.patient_id, action: 'REFILL_NOTE_SHARED', resource_type: 'CARE_NOTE', resource_id: id });
+    }
+    res.status(existing ? 200 : 201).json({ shared_today: true, note_id: id });
 });
 // GET /api/medications/doses/today - timeline of today's doses with statuses
 router.get('/doses/today', (req, res) => {
@@ -184,25 +201,12 @@ router.post('/doses/:doseId/record', (req, res) => {
         res.status(404).json({ error: 'Dose administration record not found.' });
         return;
     }
-    // Prevent duplicate recorded taken status
-    if (record.status === 'taken' && parsed.data.status === 'taken') {
+    const patientId = record.patient_id;
+    if (!verifyPatientAccess(req, res, patientId, 'manage_meds'))
+        return;
+    if (record.status === 'taken') {
         res.status(409).json({ error: 'This dose has already been recorded as taken.' });
         return;
-    }
-    // Permission check
-    const patientId = record.patient_id;
-    if (req.user?.role !== 'admin') {
-        if (req.user?.role === 'elderly' && req.user.patient_id !== patientId) {
-            res.status(403).json({ error: 'Access denied.' });
-            return;
-        }
-        if (req.user?.role === 'family' || req.user?.role === 'caregiver') {
-            const member = db.getCareCircleMember(patientId, req.user.id);
-            if (!member || !member.can_manage_meds) {
-                res.status(403).json({ error: 'Access denied. You do not have permission to record doses.' });
-                return;
-            }
-        }
     }
     const updatedRecord = db.updateAdministrationRecord(doseId, {
         status: parsed.data.status,
@@ -233,7 +237,7 @@ router.post('/doses/:doseId/record', (req, res) => {
 // GET /api/medications/:id
 router.get('/:id', (req, res) => {
     const med = db.getMedicationById(req.params.id);
-    if (!med) {
+    if (!med || med.archived_at) {
         res.status(404).json({ error: 'Medication not found.' });
         return;
     }
@@ -244,13 +248,18 @@ router.get('/:id', (req, res) => {
 // PUT /api/medications/:id - update medication
 router.put('/:id', (req, res) => {
     const med = db.getMedicationById(req.params.id);
-    if (!med) {
+    if (!med || med.archived_at) {
         res.status(404).json({ error: 'Medication not found.' });
         return;
     }
     if (!verifyPatientAccess(req, res, med.patient_id, 'manage_meds'))
         return;
-    const updated = db.updateMedication(med.id, req.body);
+    const updates = medicationSchema.omit({ patient_id: true }).partial().safeParse(req.body);
+    if (!updates.success) {
+        res.status(400).json({ error: 'Invalid prescription fields.' });
+        return;
+    }
+    const updated = db.updateMedication(med.id, updates.data);
     db.logAudit({
         actor_id: req.user?.id,
         patient_id: med.patient_id,
@@ -264,7 +273,7 @@ router.put('/:id', (req, res) => {
 // PATCH /api/medications/:id/pause - toggle active status
 router.patch('/:id/pause', (req, res) => {
     const med = db.getMedicationById(req.params.id);
-    if (!med) {
+    if (!med || med.archived_at) {
         res.status(404).json({ error: 'Medication not found.' });
         return;
     }
@@ -287,7 +296,7 @@ router.patch('/:id/pause', (req, res) => {
 // DELETE /api/medications/:id - delete medication
 router.delete('/:id', (req, res) => {
     const med = db.getMedicationById(req.params.id);
-    if (!med) {
+    if (!med || med.archived_at) {
         res.status(404).json({ error: 'Medication not found.' });
         return;
     }

@@ -40,6 +40,7 @@ router.get('/logs', (req: Request, res: Response): void => {
     return;
   }
 
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
   const logs = db.getAuditLogs(patientId);
   res.json({ logs });
 });

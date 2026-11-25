@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api.js';
 import { useLanguage } from '../../context/LanguageContext.js';
-import { X, Plus, Trash2, Pill } from 'lucide-react';
+import { X, Pill } from 'lucide-react';
 
 interface AddMedicationModalProps {
   isOpen: boolean;
@@ -19,11 +19,11 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
   const { t } = useLanguage();
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Blood Pressure');
-  const [dosage, setDosage] = useState('1 Tablet');
-  const [strength, setStrength] = useState('10mg');
+  const [dosage, setDosage] = useState('');
+  const [strength, setStrength] = useState('');
   const [frequency, setFrequency] = useState('Once daily');
-  const [timesOfDay, setTimesOfDay] = useState<string[]>(['08:00']);
-  const [instructions, setInstructions] = useState('Take in the morning with water.');
+  const [timesOfDay, setTimesOfDay] = useState<string[]>(['']);
+  const [instructions, setInstructions] = useState('');
   const [prescribingDoctor, setPrescribingDoctor] = useState('');
   const [pharmacy, setPharmacy] = useState('');
   const [iconType, setIconType] = useState<'pill' | 'capsule' | 'liquid' | 'injection' | 'drops'>('pill');
@@ -34,15 +34,11 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleAddTime = () => {
-    setTimesOfDay(prev => [...prev, '19:00']);
-  };
-
-  const handleRemoveTime = (index: number) => {
-    if (timesOfDay.length > 1) {
-      setTimesOfDay(prev => prev.filter((_, idx) => idx !== index));
-    }
-  };
+  function changeFrequency(value: string) {
+    setFrequency(value);
+    const count = value === 'Three times daily' ? 3 : value === 'Twice daily' ? 2 : 1;
+    setTimesOfDay(previous => Array.from({ length: count }, (_, index) => previous[index] ?? ''));
+  }
 
   const handleTimeChange = (index: number, val: string) => {
     const updated = [...timesOfDay];
@@ -66,7 +62,7 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
         dosage: dosage.trim(),
         strength: strength.trim(),
         frequency,
-        times_of_day: timesOfDay,
+        times_of_day: frequency === 'As needed' ? [] : timesOfDay,
         instructions: instructions.trim(),
         prescribing_doctor: prescribingDoctor.trim(),
         pharmacy: pharmacy.trim(),
@@ -174,7 +170,7 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 mb-1">Frequency</label>
               <select
                 value={frequency}
-                onChange={e => setFrequency(e.target.value)}
+                onChange={e => changeFrequency(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
               >
                 <option value="Once daily">Once daily</option>
@@ -185,40 +181,25 @@ export const AddMedicationModal: React.FC<AddMedicationModalProps> = ({
             </div>
           </div>
 
-          {/* Times of Day */}
-          <div>
+          {frequency !== 'As needed' && <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-bold text-slate-700">Scheduled Times of Day (24-Hour)</label>
-              <button
-                type="button"
-                onClick={handleAddTime}
-                className="text-[11px] font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Time Slot
-              </button>
+
             </div>
             <div className="flex flex-wrap gap-2">
               {timesOfDay.map((time, idx) => (
                 <div key={idx} className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
                   <input
-                    type="time"
+                    required aria-label={`Scheduled time ${idx + 1}`} type="time"
                     value={time}
                     onChange={e => handleTimeChange(idx, e.target.value)}
                     className="px-2 py-1 text-xs bg-transparent border-none focus:outline-none font-semibold text-slate-800"
                   />
-                  {timesOfDay.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTime(idx)}
-                      className="p-1 text-slate-400 hover:text-rose-600"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Instructions for Patient</label>

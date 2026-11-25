@@ -26,6 +26,8 @@ export const app = express();
 
 // Trust reverse proxy (Vercel, Cloud Run, load balancers)
 app.set('trust proxy', 1);
+app.set('json replacer', (key: string, value: unknown) =>
+  ['password_hash', 'passcode_hash'].includes(key) ? undefined : value);
 
 // Security and middleware
 app.use(helmet({

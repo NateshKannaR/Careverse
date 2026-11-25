@@ -92,3 +92,19 @@ html.high-contrast button {
     scroll-behavior: auto !important;
   }
 }
+
+@layer components {
+  .care-action {
+    @apply flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-card transition hover:border-teal-400;
+  }
+  .care-action-icon {
+    @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-800;
+  }
+  .care-action > div { @apply min-w-0 flex-1 break-words; }
+  .care-action strong { @apply block font-bold text-navy-950; }
+  .care-action p { @apply mt-0.5 text-sm text-slate-600; }
+  .care-action > svg { @apply h-4 w-4 shrink-0 text-teal-700; }
+}
+progress { accent-color: #5eead4; }
+progress::-webkit-progress-bar { background: #115e59; }
+progress::-webkit-progress-value { background: #5eead4; }

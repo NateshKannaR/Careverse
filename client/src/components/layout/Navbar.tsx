@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   BarChart3, Calendar, Heart, KeyRound, LogOut, Mail, Menu, Pill, Settings, ShieldAlert, Users, X,
 } from 'lucide-react';
@@ -22,6 +22,7 @@ export const Navbar: React.FC = () => {
   const { user, logout, demoLogin } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const header = useRef<HTMLElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -68,6 +69,7 @@ export const Navbar: React.FC = () => {
     setRoleError('');
     try {
       await demoLogin(role);
+      navigate('/dashboard');
       setMenuOpen(false);
       menuButton.current?.focus();
     } catch {
@@ -77,7 +79,8 @@ export const Navbar: React.FC = () => {
     }
   }
 
-  const navItems = navLinks.map(({ to, label, icon: Icon }) => (
+  const visibleLinks = user?.role === 'admin' ? navLinks.filter(link => ['/dashboard', '/settings'].includes(link.to)) : navLinks;
+  const navItems = visibleLinks.map(({ to, label, icon: Icon }) => (
     <NavLink
       key={to}
       to={to}
@@ -113,7 +116,7 @@ export const Navbar: React.FC = () => {
                     <p className="max-w-[12rem] truncate text-sm font-semibold text-navy-950">{user.full_name}</p>
                     <p className="text-xs capitalize text-slate-600">{user.role}</p>
                   </div>
-                  <button
+                  {user.role !== 'admin' && <button
                     type="button"
                     onClick={() => { setSosModalOpen(true); setMenuOpen(false); }}
                     aria-label="Trigger Emergency Assistance"
@@ -121,7 +124,7 @@ export const Navbar: React.FC = () => {
                   >
                     <ShieldAlert aria-hidden="true" className="h-4 w-4 shrink-0" />
                     SOS
-                  </button>
+                  </button>}
                 </>
               ) : (
                 <Link
@@ -166,24 +169,24 @@ export const Navbar: React.FC = () => {
             )}
             <A11yToolbar />
             <div className="mt-3 grid gap-1.5">
-              <button
+              {user && user.role !== 'admin' && <button
                 type="button"
                 onClick={() => { setSimulatorOpen(true); setMenuOpen(false); }}
                 className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
               >
                 <Mail aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
                 Simulated Inbox
-              </button>
+              </button>}
               {user ? (
                 <>
-                  <button
+                  {user.role !== 'admin' && <button
                     type="button"
                     onClick={() => { setPasscodeModalOpen(true); setMenuOpen(false); }}
                     className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
                   >
                     <KeyRound aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-700" />
                     Passcode Circle
-                  </button>
+                  </button>}
                   <section aria-labelledby="demo-role-label" className="border-y border-slate-200 py-3">
                     <h2 id="demo-role-label" className="mb-2 px-1 text-sm font-semibold text-slate-700">Demo account</h2>
                     <div className="grid grid-cols-2 gap-2">

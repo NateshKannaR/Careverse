@@ -88,17 +88,17 @@ export const CareCirclePage: React.FC = () => {
           <p className="text-sm text-slate-500 mt-1">{t.careCircle.subtitle}</p>
         </div>
 
-        <button
+        {user?.role === 'elderly' && <button
           onClick={() => setInviteModalOpen(true)}
           className="px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md transition flex items-center gap-2 self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4" />
           <span>{t.careCircle.inviteMember}</span>
-        </button>
+        </button>}
       </div>
 
       {/* Accept Invitation Code Input Box */}
-      <div className="bg-gradient-to-r from-teal-50 to-sky-50 rounded-3xl p-6 border border-teal-200 shadow-xs">
+      {(user?.role === 'family' || user?.role === 'caregiver') && <div className="bg-gradient-to-r from-teal-50 to-sky-50 rounded-3xl p-6 border border-teal-200 shadow-xs">
         <h3 className="text-sm font-bold text-navy-950 flex items-center gap-2 mb-2">
           <Key className="w-4 h-4 text-teal-600" />
           <span>Have an Invitation Code? Accept Care Circle Access</span>
@@ -131,7 +131,7 @@ export const CareCirclePage: React.FC = () => {
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </form>
-      </div>
+      </div>}
 
       {/* Active Care Circle Members */}
       <div className="space-y-4">

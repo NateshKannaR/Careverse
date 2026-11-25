@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, CalendarDays, Download } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { AdherenceInsightsCard } from '../components/analytics/AdherenceInsightsCard.js';
 import { CareBuddyWidget } from '../components/carebuddy/CareBuddyWidget.js';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
@@ -202,6 +203,7 @@ export function AnalyticsPage() {
           </div>
         </>
       )}
+      {trend && <AdherenceInsightsCard patientId={patientId} />}
       <CareBuddyWidget patientId={patientId} />
     </div>
   );

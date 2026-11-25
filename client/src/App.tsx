@@ -14,7 +14,7 @@ import { DashboardRouterPage } from './pages/DashboardRouterPage.js';
 import { MedicationsPage } from './pages/MedicationsPage.js';
 import { AppointmentsPage } from './pages/AppointmentsPage.js';
 import { CareCirclePage } from './pages/CareCirclePage.js';
-import { AnalyticsPage } from './pages/AnalyticsPage.js';
+const AnalyticsPage = React.lazy(async () => ({ default: (await import('./pages/AnalyticsPage.js')).AnalyticsPage }));
 import { SettingsPage } from './pages/SettingsPage.js';
 
 const queryClient = new QueryClient({
@@ -94,7 +94,7 @@ export const App: React.FC = () => {
                       path="/analytics"
                       element={
                         <ProtectedRoute>
-                          <AnalyticsPage />
+                          <React.Suspense fallback={<p role="status" className="care-width py-6">Loading report…</p>}><AnalyticsPage /></React.Suspense>
                         </ProtectedRoute>
                       }
                     />

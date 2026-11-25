@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
+import { checkPatientAccess } from '../middleware/rbacMiddleware.js';
 import { EmailService } from '../services/emailService.js';
 const router = Router();
 router.use(authenticateJwt);
@@ -57,8 +58,10 @@ router.put('/preferences', (req, res) => {
 });
 // GET /api/notifications/simulator - Evaluator Visual Notification Simulator Inbox
 router.get('/simulator', (req, res) => {
-    // Returns all dispatched notifications with recipient details and HTML preview
-    const all = db.getAllNotifications().map(n => ({
+    const viewer = req.user;
+    const visible = db.getAllNotifications().filter(item => item.recipient_id === viewer.id || viewer.role === 'admin' ||
+        (item.patient_id && checkPatientAccess(viewer, item.patient_id, 'view').allowed));
+    const all = visible.map(n => ({
         ...n,
         recipient: db.getProfileById(n.recipient_id)
     }));

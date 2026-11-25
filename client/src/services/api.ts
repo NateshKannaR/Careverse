@@ -100,7 +100,7 @@ export const api = {
       const q = new URLSearchParams();
       if (patientId) q.append('patientId', patientId);
       if (activeOnly) q.append('active', 'true');
-      return fetch(`/api/medications?${q.toString()}`, { headers: getAuthHeaders() }).then<{ medications: any[] }>(handleResponse);
+      return fetch(`/api/medications?${q.toString()}`, { headers: getAuthHeaders() }).then<{ medications: any[]; can_manage: boolean }>(handleResponse);
     },
     create: (body: any) =>
       fetch('/api/medications', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body) }).then(handleResponse),
@@ -130,7 +130,7 @@ export const api = {
   appointments: {
     getAll: (patientId?: string) => {
       const q = patientId ? `?patientId=${patientId}` : '';
-      return fetch(`/api/appointments${q}`, { headers: getAuthHeaders() }).then<{ appointments: any[] }>(handleResponse);
+      return fetch(`/api/appointments${q}`, { headers: getAuthHeaders() }).then<{ appointments: any[]; can_manage: boolean; time_zone: string }>(handleResponse);
     },
     create: (body: any) =>
       fetch('/api/appointments', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body) }).then(handleResponse),

@@ -111,10 +111,11 @@ router.post('/sos', async (req, res) => {
             condition: patient?.primary_condition
         }
     });
+    const delivery = { sent: 0, simulated: 0, failed: 0, pending: 0 };
     // Dispatch emergency notifications to all active Care Circle members
     for (const member of careCircle) {
         if (member.member) {
-            await EmailService.sendEmail({
+            const result = await EmailService.sendEmail({
                 recipientEmail: member.member.email,
                 recipientId: member.member.id,
                 patientId,
@@ -130,11 +131,13 @@ router.post('/sos', async (req, res) => {
            </div>
            <p style="margin-top: 16px;"><strong>Immediate Action:</strong> Attempt voice contact immediately. If you cannot reach them or suspect an acute emergency, please contact local emergency medical services (911 / 112) without delay.</p>`, 'This notification was triggered directly from the patient’s active CAREVERSE dashboard.')
             });
+            delivery[result.success ? result.status : 'failed']++;
         }
     }
     res.json({
+        delivery,
         status: 'activated',
-        message: 'Emergency SOS alert dispatched to your Care Circle and designated contacts.',
+        message: 'SOS activation recorded. Review the Care Circle email delivery counts.',
         patientName,
         contacts,
         instructions: {
@@ -163,7 +166,7 @@ router.post('/cancel', (req, res) => {
     });
     res.json({
         status: 'cancelled',
-        message: 'Emergency SOS activation was marked as cancelled. Your Care Circle has been notified that you are safe.'
+        message: 'Cancellation recorded in the activity log.'
     });
 });
 export default router;

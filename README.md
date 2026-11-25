@@ -4,14 +4,16 @@ Careverse helps older adults, families, and caregivers coordinate medication sch
 
 [Open the live demo](https://careversebynk.vercel.app/) · [Try the walkthrough](#demo-walkthrough) · [Run locally](#run-locally) · [Review the evidence](#verification)
 
-![Careverse adherence report showing recorded adherence, outcome coverage, and day-by-day medication activity for a fictional demo patient](docs/screenshots/adherence-report.jpg)
+![Patient dashboard with a daily care plan, the next dose, wellbeing check-in, next visit, and care resources](docs/screenshots/daily-care-plan.jpg)
 
 ## Demo walkthrough
 
-1. Open [Careverse](https://careversebynk.vercel.app/) and choose **Patient** under **Explore the demo**. The public demo uses fictional accounts and dose history.
-2. Open **Analytics & Reports**. Compare **Recorded adherence** with **Due doses with a recorded outcome**. The first shows the proportion taken among logged outcomes. The second shows how much of the schedule has been accounted for.
-3. Switch from **7 days** to **14 days**, then use **Inspect a day** to read the exact counts behind the chart. **Download dose log** exports the authenticated patient’s dose history as a CSV.
-4. Choose **Family** from the **Menu**. The daily digest uses the same records as the patient’s routine summary. Use **CareBuddy** to review the routine or prepare questions for an upcoming visit.
+1. Choose **Try the patient demo**. Open the wellbeing check-in, choose a mood and save it. Reopen it to review the saved answers.
+2. Under **Care resources**, open **Medication supply** and choose **Share refill note**. Open **Menu → Caregiver** to find that prescription in **Shared care notes**. A second attempt on the same day reuses the existing note.
+3. Open **Appointments** to schedule a visit, check off a preparation task and export the visit to a calendar. Past visits remain in **Visit history** with their recorded status.
+4. Open **Analytics & Reports**, select a period and inspect a day. **Download dose log** exports the patient’s history. Family members can review the same activity in their digest.
+
+![Adherence report for the fictional demo patient](docs/screenshots/adherence-report.jpg)
 
 The menu includes larger text, high contrast, and English, Tamil, and Hindi interface options. The patient, family, caregiver, and admin views adapt to phone and desktop widths.
 
@@ -19,7 +21,7 @@ The menu includes larger text, high contrast, and English, Tamil, and Hindi inte
 
 | Workflow | How it works |
 | --- | --- |
-| Medication routine | Record taken or skipped doses, inspect the timeline, and estimate refill dates from the remaining supply. |
+| Medication routine | Record taken or skipped doses, inspect the timeline, and estimate full days of supply and share refill notes. |
 | Adherence reports | Compare 7-, 14-, and 30-day periods, inspect individual days, and see recurring gaps by time slot. |
 | Wellbeing and appointments | Log a daily check-in, review a visit checklist, and export appointment reminders to a calendar. |
 | Care Circle | Invite family or caregivers with expiring passcodes, approve requests, and set permissions. |
@@ -44,9 +46,12 @@ The checks below run on fixed synthetic records. They measure the outputs descri
 | Suite | Previous version | Updated version |
 | --- | ---: | ---: |
 | [Adherence scenarios](server/tests/unit/adherenceAccuracy.test.ts) | 4 of 15 at `52bff56` | 15 of 15 |
+| [Care-plan workflow scenarios](server/tests/integration/carePlanWorkflows.test.ts) | 0 of 11 at `a705b85` | 11 of 11 |
 | [Daily care evidence scenarios](server/tests/unit/careEvidenceAccuracy.test.ts) | 1 of 11 at `23af8e0` | 11 of 11 |
 
-The full build passed 96 automated tests. Browser checks exercised the period selector, daily breakdown, authenticated CSV, and layouts from 320 to 1440 px. The daily-care cases cover skipped doses, missing outcomes, future doses, local midnight, the repeated daylight-saving hour, and the assistant’s recap. [API integration tests](server/tests/integration/adherenceReport.test.ts) check agreement across the timeline and score, invalid dates, and authenticated CSV exports.
+The regression suite passes 117 automated tests across the server and client. The care-plan scenarios exercise a newly added prescription, pause and resume, as-needed medication, retained dose history, refill handoffs, visit classification, daylight-saving transitions and simulated SOS delivery. The [time-zone tests](server/tests/unit/patientSchedule.test.ts) also cover India and Nepal, leap day and the change between summer and winter offsets.
+
+Browser checks covered patient check-in edits, a refill note read by family and caregiver, a caregiver handoff, visit creation and cancellation, the checklist, calendar export, and all four demo dashboards. Nine routes were checked at six widths from 320 to 1440 px for horizontal overflow.
 
 ```sh
 npm test
@@ -99,6 +104,6 @@ flowchart LR
 
 Use the repository root and the **Other** framework preset. [`vercel.json`](vercel.json) installs the workspace dependencies and builds the static frontend plus one Express function. After deployment, verify [the login route](https://careversebynk.vercel.app/login) and [API health](https://careversebynk.vercel.app/api/health).
 
-Set a unique `JWT_SECRET` for your project. The Vercel function stores demo data in temporary storage. Function restarts may reset those records. The standalone server runs the scheduled reminder loop.
+Set a unique `JWT_SECRET` for your project. The Vercel function stores demo data in temporary storage. Function restarts may reset those records. Opening a care plan generates the current day’s scheduled doses. The standalone server runs the background reminder loop. The hosted demo supports on-demand reminder simulations. Refill handoffs remain inside Careverse. The SOS confirmation reports provider submissions and simulations separately.
 
 The package metadata declares the MIT license. Careverse was built for the Intelligent Elderly Healthcare Ecosystem Challenge.

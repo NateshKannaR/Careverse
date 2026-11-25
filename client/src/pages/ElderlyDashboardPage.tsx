@@ -1,402 +1,110 @@
-import type { DailyCareScore } from '../types/index.js';
-import { formatDoseTime } from '../utils/doseTime.js';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, ClipboardList, Heart, Package, Pill, Plus, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
-import { useA11y } from '../context/A11yContext.js';
 import { api } from '../services/api.js';
+import type { DailyCareScore, MedicationAdministrationRecord, Appointment, WellbeingCheckin } from '../types/index.js';
+import { formatDoseTime } from '../utils/doseTime.js';
 import { DoseTimeline } from '../components/medication/DoseTimeline.js';
-import { RefillPredictionWidget } from '../components/medication/RefillPredictionWidget.js';
-import { AdherenceInsightsCard } from '../components/analytics/AdherenceInsightsCard.js';
 import { AddMedicationModal } from '../components/medication/AddMedicationModal.js';
-import { AddAppointmentModal } from '../components/appointment/AddAppointmentModal.js';
 import { DailyCheckInModal } from '../components/wellbeing/DailyCheckInModal.js';
-import { InviteMemberModal } from '../components/care-circle/InviteMemberModal.js';
 import { CareBuddyWidget } from '../components/carebuddy/CareBuddyWidget.js';
-import {
-  Heart,
-  Pill,
-  Calendar,
-  Users,
-  CheckCircle2,
-  Clock,
-  Plus,
-  ShieldAlert,
-  ArrowRight,
-  Smile,
-  AlertCircle,
-  Activity,
-  Bot
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
 
-export const ElderlyDashboardPage: React.FC = () => {
+export function ElderlyDashboardPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [doseTimeZone, setDoseTimeZone] = useState<string>();
-  const { speakAnnouncement } = useA11y();
-
-  const [doses, setDoses] = useState<any[]>([]);
-  const [doseSummary, setDoseSummary] = useState<any>({ total: 0, taken: 0, upcoming: 0, due_now: 0, missed: 0 });
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [careCircle, setCareCircle] = useState<any[]>([]);
-  const [careScore, setCareScore] = useState<DailyCareScore | null>(null);
-  const [todayCheckin, setTodayCheckin] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Modals
-  const [addMedModal, setAddMedModal] = useState(false);
-  const [addApptModal, setAddApptModal] = useState(false);
-  const [checkinModal, setCheckinModal] = useState(false);
-  const [inviteModal, setInviteModal] = useState(false);
-
-  const fetchDashboardData = async () => {
-    try {
-      const [dosesRes, apptsRes, circleRes, scoreRes, checkinRes] = await Promise.all([
-        api.medications.getTodayDoses(user?.patient_id),
-        api.appointments.getAll(user?.patient_id),
-        api.careCircle.getMembers(user?.patient_id),
-        api.analytics.getDailyScore(user?.patient_id),
-        api.wellbeing.getToday(user?.patient_id)
-      ]);
-
-      if (dosesRes) {
-        setDoses(dosesRes.records || []);
-        setDoseTimeZone(dosesRes.time_zone);
-        setDoseSummary(dosesRes.summary || { total: 0, taken: 0, upcoming: 0, due_now: 0, missed: 0 });
-      }
-      if (apptsRes) setAppointments(apptsRes.appointments || []);
-      if (circleRes) setCareCircle(circleRes.members || []);
-      if (scoreRes) setCareScore(scoreRes.score);
-      if (checkinRes) setTodayCheckin(checkinRes.checkin);
-    } catch (err) {
-      console.error('Error fetching elderly dashboard data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const patientId = user?.patient_id;
+  const [data, setData] = useState<{
+    doses: MedicationAdministrationRecord[]; zone: string; score: DailyCareScore;
+    checkin: WellbeingCheckin | null; visit?: Appointment;
+  }>();
+  const [error, setError] = useState('');
+  const [modal, setModal] = useState<'medication' | 'checkin'>();
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision(value => value + 1), []);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [user]);
+    let current = true;
+    setError('');
+    Promise.all([
+      api.medications.getTodayDoses(patientId), api.analytics.getDailyScore(patientId),
+      api.wellbeing.getToday(patientId), api.appointments.getAll(patientId),
+    ]).then(([timeline, report, wellbeing, visits]) => {
+      if (current) setData({ doses: timeline.records, zone: timeline.time_zone, score: report.score,
+        checkin: wellbeing.checkin, visit: visits.appointments.find(visit => visit.is_upcoming) });
+    }).catch(() => { if (current) setError('Your care plan could not be loaded.'); });
+    return () => { current = false; };
+  }, [patientId, revision]);
 
-  const todayFormatted = new Date().toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  useEffect(() => {
+    const update = () => { if (!document.hidden) refresh(); };
+    const timer = window.setInterval(update, 60_000);
+    document.addEventListener('visibilitychange', update);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', update); };
+  }, [refresh]);
 
-  const nextUpcomingDose = doses.find(d => d.status === 'upcoming' || d.status === 'due_now');
-  const nextAppointment = appointments.find(a => a.status === 'scheduled');
-
+  const next = data?.doses.find(dose => dose.status === 'due_now' || dose.status === 'upcoming');
+  const date = new Date().toLocaleDateString(undefined, { timeZone: data?.zone, weekday: 'long', month: 'long', day: 'numeric' });
+  const resources = [
+    { path: '/medications?view=supply', label: 'Medication supply', icon: Package },
+    { path: '/analytics', label: t.nav.analytics, icon: BarChart3 },
+    { path: '/care-circle', label: t.nav.careCircle, icon: Users },
+  ];
   return (
     <div className="care-page animate-fade-in">
-      {/* Top Banner: Welcome & Today Date */}
-      <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-navy-900 rounded-3xl p-4 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <header className="grid gap-5 rounded-3xl bg-teal-950 p-5 text-white sm:p-7 md:grid-cols-[1fr_minmax(15rem,22rem)] md:items-center">
         <div>
-          <div className="flex items-center gap-2 text-teal-200 text-xs font-bold uppercase tracking-wider mb-1">
-            <Heart className="w-4 h-4 fill-teal-400 text-teal-400" />
-            <span>Elderly Healthcare Center</span>
-          </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
-            {t.common.welcome}, {user?.full_name}!
-          </h1>
-          <p className="text-sm sm:text-base text-teal-100/90 font-medium mt-1">
-            {todayFormatted}
-          </p>
+          <p className="flex items-center gap-2 text-sm font-medium text-teal-100"><CalendarDays size={16} />{date}</p>
+          <h1 className="mt-2 break-words text-3xl font-bold tracking-tight sm:text-4xl">{t.common.welcome}, {user?.full_name}</h1>
         </div>
-
-        {/* Routine Care Score Ring */}
-        {careScore && (
-          <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-5 py-4 rounded-2xl border border-white/20">
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-white/20"
-                  strokeWidth="3.5"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-emerald-400"
-                  strokeDasharray={`${careScore.score ?? 0}, 100`}
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <span className="absolute text-sm font-black text-white">
-                {careScore.score === null ? '—' : `${careScore.score}%`}
-              </span>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-teal-200">
-                Daily Routine Care Score
-              </div>
-              <div className="text-base font-extrabold text-white">
-                {careScore.score === null ? 'Awaiting activity' : careScore.rating}
-              </div>
-              <div className="text-[10px] text-teal-200/80">
-                {careScore.metrics.completedItems} of {careScore.metrics.routineItems} routine items completed
-              </div>
-            </div>
+        {data && <div className="rounded-2xl border border-teal-700 bg-teal-900 p-4">
+          <div className="flex justify-between gap-2 text-sm"><span>Daily routine</span><strong>{data.score.score === null ? 'Awaiting activity' : `${data.score.score}%`}</strong></div>
+          <progress className="my-1.5 block h-2 w-full overflow-hidden rounded-full" value={data.score.metrics.completedItems} max={data.score.metrics.routineItems} aria-label="Completed routine items" />
+          <p className="text-xs text-teal-100">{data.score.metrics.completedItems} of {data.score.metrics.routineItems} due routine items complete</p>
+        </div>}
+      </header>
+      {error && <div role="alert" className="flex items-center justify-between rounded-xl bg-amber-50 p-4 text-amber-900">{error}<button className="font-bold underline" onClick={refresh}>Retry</button></div>}
+      {!data && !error && <p role="status">Loading your care plan…</p>}
+      {data && <>
+        <section aria-labelledby="today-title">
+          <h2 id="today-title" className="mb-3 text-xl font-bold text-navy-950">Today’s care plan</h2>
+          <div className="grid gap-2.5 md:grid-cols-3">
+            <a className="care-action" href="#daily-doses"><span className="care-action-icon"><Pill /></span>
+              <div><strong>{next?.status === 'due_now' ? 'Dose due' : next ? 'Next dose' : 'Dose schedule'}</strong>
+                <p>{next ? `${next.medication?.name} · ${formatDoseTime(next.scheduled_time, data.zone)}` : `${data.doses.length} scheduled today`}</p></div><ChevronRight /></a>
+            <button className="care-action" onClick={() => setModal('checkin')}><span className="care-action-icon bg-rose-50 text-rose-700"><Heart /></span>
+              <div><strong>{data.checkin ? 'Update check-in' : 'Start check-in'}</strong>
+                <p>{data.checkin ? `Mood · ${data.checkin.mood}` : 'Record how you feel today'}</p></div><ChevronRight /></button>
+            <Link className="care-action" to="/appointments"><span className="care-action-icon bg-sky-50 text-sky-800"><CalendarDays /></span>
+              <div><strong>Next visit</strong><p>{data.visit ? `${data.visit.doctor_name} · ${new Date(data.visit.appointment_date + 'T12:00:00Z').toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' })}` : 'View or schedule a visit'}</p></div><ChevronRight /></Link>
           </div>
-        )}
-      </div>
-
-      {/* Main Grid: Doses & Schedule vs Sidebar Cards */}
-      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
-        {/* Left 2 Columns: Medication Doses & Timeline */}
-        <div className="min-w-0 lg:col-span-2 space-y-6">
-          {/* Next Dose Focus Card */}
-          {nextUpcomingDose && (
-            <div className="p-5 sm:p-6 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-3xl border-2 border-teal-500/30 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-teal-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
-                  <Pill className="w-7 h-7" />
-                </div>
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700 bg-teal-100/70 px-2 py-0.5 rounded-full">
-                    Next Scheduled Dose
-                  </span>
-                  <h3 className="text-lg font-black text-navy-950 mt-1">
-                    {nextUpcomingDose.medication?.name} ({nextUpcomingDose.medication?.dosage})
-                  </h3>
-                  <p className="text-xs text-slate-600 flex items-center gap-1.5 mt-0.5">
-                    <Clock className="w-3.5 h-3.5 text-teal-700" />
-                    Scheduled for {formatDoseTime(nextUpcomingDose.scheduled_time, doseTimeZone)}
-                    {nextUpcomingDose.medication?.instructions && ` • ${nextUpcomingDose.medication.instructions}`}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={async () => {
-                  await api.medications.recordDose(nextUpcomingDose.id, 'taken');
-                  speakAnnouncement(`Recorded ${nextUpcomingDose.medication?.name} as taken.`);
-                  fetchDashboardData();
-                }}
-                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 flex-shrink-0 text-sm"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{t.medications.markTaken}</span>
-              </button>
+        </section>
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
+          <section id="daily-doses" tabIndex={-1} className="min-w-0 scroll-mt-36 rounded-3xl border border-slate-200 bg-white p-4 shadow-card sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div><h2 className="text-xl font-bold text-navy-950">{t.medications.dailySchedule}</h2>
+                <p className="text-sm text-slate-600">{data.score.metrics.completedDoses} of {data.score.metrics.dueDoses} due doses taken</p></div>
+              <button onClick={() => setModal('medication')} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-teal-50 px-3 text-sm font-bold text-teal-800"><Plus size={16} />{t.medications.addMedication}</button>
             </div>
-          )}
-
-          {/* Today's Medication Timeline */}
-          <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6 pb-4 border-b border-slate-100">
-              <div>
-                <h2 className="text-lg font-bold text-navy-950">{t.medications.dailySchedule}</h2>
-                <p className="text-xs text-slate-500">
-                  {doseSummary.taken} of {doseSummary.due ?? 0} due doses taken
-                </p>
-              </div>
-              <button
-                onClick={() => setAddMedModal(true)}
-                className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-xl text-xs font-bold border border-teal-200 transition flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>{t.medications.addMedication}</span>
-              </button>
-            </div>
-
-            <DoseTimeline records={doses} onDoseUpdated={fetchDashboardData} canManageMeds={true} timeZone={doseTimeZone} />
-          </div>
-
-          {/* Adherence Pattern Insights & Habit Guidance */}
-          <AdherenceInsightsCard
-            patientId={user?.patient_id}
-            doseRevision={doses.map(dose => `${dose.id}:${dose.status}`).join('|')}
-          />
-
-          {/* Days-to-Depletion Refill Forecast Engine */}
-          <RefillPredictionWidget patientId={user?.patient_id} />
+            <DoseTimeline records={data.doses} timeZone={data.zone} onDoseUpdated={refresh} />
+          </section>
+          <aside className="space-y-4">
+            {data.checkin && <section className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
+              <h2 className="flex items-center gap-2 font-bold text-teal-950"><Check size={17} />Today’s wellbeing</h2>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt>Energy</dt><dd className="font-bold">{data.checkin.energy_level} / 5</dd></div><div><dt>Pain</dt><dd className="font-bold">{data.checkin.pain_level} / 10</dd></div></dl>
+              {data.checkin.notes && <p className="mt-3 break-words text-sm">{data.checkin.notes}</p>}
+            </section>}
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+              <h2 className="mb-2 flex items-center gap-2 font-bold text-navy-950"><ClipboardList size={18} />Care resources</h2>
+              {resources.map(({ path, label, icon: Icon }) => <Link to={path} key={path} className="flex min-h-12 items-center gap-2 border-t border-slate-100 py-2 text-sm font-semibold text-teal-800"><Icon size={17} />{label}<ArrowRight className="ml-auto" size={15} /></Link>)}
+            </section>
+          </aside>
         </div>
-
-        {/* Right 1 Column: Wellbeing, Appointments, Care Circle, Quick Actions */}
-        <div className="space-y-6">
-          {/* Daily Wellbeing Check-in Card */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
-            <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <Smile className="w-5 h-5 text-teal-600" />
-                <h3 className="font-bold text-sm text-navy-950">{t.wellbeing.title}</h3>
-              </div>
-              {todayCheckin && (
-                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                  Recorded Today
-                </span>
-              )}
-            </div>
-
-            {todayCheckin ? (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Mood:</span>
-                  <span className="font-bold text-slate-800 capitalize">{todayCheckin.mood}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Energy Level:</span>
-                  <span className="font-bold text-teal-800">{todayCheckin.energy_level} / 5</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Pain Level:</span>
-                  <span className="font-bold text-slate-800">{todayCheckin.pain_level} / 10</span>
-                </div>
-                {todayCheckin.notes && (
-                  <p className="pt-2 border-t border-slate-200 text-slate-600 italic">
-                    "{todayCheckin.notes}"
-                  </p>
-                )}
-                <button
-                  onClick={() => setCheckinModal(true)}
-                  className="w-full mt-2 py-1.5 text-xs text-teal-700 font-bold hover:underline"
-                >
-                  Update Check-in
-                </button>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs text-slate-600 mb-4">
-                  Take a moment to record how you are feeling today for your family and caregiver.
-                </p>
-                <button
-                  onClick={() => setCheckinModal(true)}
-                  className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  Start Check-in
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Next Medical Appointment Card */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
-            <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-teal-600" />
-                <h3 className="font-bold text-sm text-navy-950">Next Doctor Visit</h3>
-              </div>
-              <button
-                onClick={() => setAddApptModal(true)}
-                className="text-xs text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" /> Schedule
-              </button>
-            </div>
-
-            {nextAppointment ? (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-2">
-                <div className="font-bold text-slate-900 text-sm">
-                  {nextAppointment.doctor_name}
-                </div>
-                <div className="text-slate-600">
-                  {nextAppointment.specialty} • {nextAppointment.hospital_clinic}
-                </div>
-                <div className="text-teal-800 font-semibold flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" /> {nextAppointment.appointment_date} at {nextAppointment.appointment_time}
-                </div>
-                <p className="text-slate-500 italic mt-1">{nextAppointment.appointment_purpose}</p>
-
-                {nextAppointment.preparation_checklist?.length > 0 && (
-                  <div className="pt-2 border-t border-slate-200">
-                    <span className="font-bold text-slate-700 block mb-1">Pre-Visit Tasks:</span>
-                    <ul className="space-y-1">
-                      {nextAppointment.preparation_checklist.map((t: any, idx: number) => (
-                        <li key={idx} className="flex items-center gap-1.5 text-slate-600">
-                          <span className={t.completed ? 'line-through text-slate-400' : ''}>
-                            {t.completed ? '✓' : '○'} {t.task}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 py-4 text-center">
-                No upcoming appointments scheduled.
-              </p>
-            )}
-          </div>
-
-          {/* Care Circle Summary Card */}
-          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
-            <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-teal-600" />
-                <h3 className="font-bold text-sm text-navy-950">{t.careCircle.title}</h3>
-              </div>
-              <button
-                onClick={() => setInviteModal(true)}
-                className="text-xs text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" /> Invite
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              {careCircle.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs"
-                >
-                  <div>
-                    <div className="font-bold text-slate-800">{member.member?.full_name || 'Member'}</div>
-                    <div className="text-[11px] text-slate-500">{member.relationship}</div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
-                    Active
-                  </span>
-                </div>
-              ))}
-            </div>
-            <Link
-              to="/care-circle"
-              className="mt-4 block text-center text-xs font-bold text-teal-700 hover:underline"
-            >
-              Manage Care Circle Permissions →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Floating CareBuddy Widget */}
-      <CareBuddyWidget patientId={user?.patient_id} />
-
-      {/* Modals */}
-      <AddMedicationModal
-        isOpen={addMedModal}
-        onClose={() => setAddMedModal(false)}
-        onMedicationAdded={fetchDashboardData}
-        patientId={user?.patient_id}
-      />
-
-      <AddAppointmentModal
-        isOpen={addApptModal}
-        onClose={() => setAddApptModal(false)}
-        onAppointmentAdded={fetchDashboardData}
-        patientId={user?.patient_id}
-      />
-
-      <DailyCheckInModal
-        isOpen={checkinModal}
-        onClose={() => setCheckinModal(false)}
-        onCheckInSaved={fetchDashboardData}
-        patientId={user?.patient_id}
-      />
-
-      <InviteMemberModal
-        isOpen={inviteModal}
-        onClose={() => setInviteModal(false)}
-        onMemberInvited={fetchDashboardData}
-        patientId={user?.patient_id}
-      />
+      </>}
+      {modal === 'medication' && <AddMedicationModal isOpen onClose={() => setModal(undefined)} onMedicationAdded={refresh} patientId={patientId} />}
+      {modal === 'checkin' && data && <DailyCheckInModal isOpen checkin={data.checkin} onClose={() => setModal(undefined)} onCheckInSaved={refresh} patientId={patientId} />}
+      <CareBuddyWidget patientId={patientId} />
     </div>
   );
-};
+}

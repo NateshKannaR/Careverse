@@ -3,6 +3,7 @@ import { api } from '../../services/api.js';
 import { useLanguage } from '../../context/LanguageContext.js';
 import { useA11y } from '../../context/A11yContext.js';
 import { X, Smile, Heart, CheckCircle2 } from 'lucide-react';
+import type { WellbeingCheckin } from '../../types/index.js';
 import confetti from 'canvas-confetti';
 
 interface DailyCheckInModalProps {
@@ -10,22 +11,23 @@ interface DailyCheckInModalProps {
   onClose: () => void;
   onCheckInSaved: () => void;
   patientId?: string;
+  checkin: WellbeingCheckin | null;
 }
 
 export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
   isOpen,
   onClose,
   onCheckInSaved,
-  patientId
+  patientId, checkin
 }) => {
   const { t } = useLanguage();
   const { speakAnnouncement, reducedMotion } = useA11y();
 
-  const [mood, setMood] = useState<'great' | 'good' | 'okay' | 'tired' | 'unwell'>('good');
-  const [energyLevel, setEnergyLevel] = useState<number>(4);
-  const [painLevel, setPainLevel] = useState<number>(1);
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
+  const [mood, setMood] = useState<WellbeingCheckin['mood'] | null>(checkin?.mood ?? null);
+  const [energyLevel, setEnergyLevel] = useState<number>(checkin?.energy_level ?? 3);
+  const [painLevel, setPainLevel] = useState<number>(checkin?.pain_level ?? 0);
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>(checkin?.symptoms ?? []);
+  const [notes, setNotes] = useState(checkin?.notes ?? '');
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
@@ -56,6 +58,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!mood) return;
     setLoading(true);
     try {
       await api.wellbeing.record({
@@ -113,7 +116,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
           {/* Mood Selector with accessible touch targets */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">{t.wellbeing.mood}</label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2 min-[450px]:grid-cols-5">
               {moods.map((m) => (
                 <button
                   key={m.key}
@@ -136,7 +139,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
           {/* Energy Slider */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-bold text-slate-700">{t.wellbeing.energyLevel}</label>
+              <label htmlFor="wellbeing-energy" className="text-xs font-bold text-slate-700">{t.wellbeing.energyLevel}</label>
               <span className="text-xs font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
                 {energyLevel} / 5
               </span>
@@ -145,6 +148,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
               type="range"
               min="1"
               max="5"
+              id="wellbeing-energy"
               value={energyLevel}
               onChange={e => setEnergyLevel(Number(e.target.value))}
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
@@ -159,7 +163,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
           {/* Pain Scale Slider */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-bold text-slate-700">{t.wellbeing.painLevel}</label>
+              <label htmlFor="wellbeing-pain" className="text-xs font-bold text-slate-700">{t.wellbeing.painLevel}</label>
               <span className={`text-xs font-black px-2 py-0.5 rounded-md border ${
                 painLevel === 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
                 painLevel <= 3 ? 'bg-teal-50 text-teal-800 border-teal-200' :
@@ -173,6 +177,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
               type="range"
               min="0"
               max="10"
+              id="wellbeing-pain"
               value={painLevel}
               onChange={e => setPainLevel(Number(e.target.value))}
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
@@ -194,6 +199,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
                   <button
                     key={sym}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleSymptom(sym)}
                     className={`text-xs px-3 py-1.5 rounded-full border transition ${
                       isSelected
@@ -210,8 +216,8 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">{t.wellbeing.notes}</label>
-            <textarea
+            <label htmlFor="checkin-notes" className="block text-xs font-bold text-slate-700 mb-1">{t.wellbeing.notes}</label>
+            <textarea id="checkin-notes"
               rows={2}
               value={notes}
               onChange={e => setNotes(e.target.value)}
@@ -230,7 +236,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !mood}
               className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition flex items-center gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />

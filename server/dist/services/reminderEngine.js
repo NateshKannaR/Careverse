@@ -1,3 +1,5 @@
+import { localSlotInstant } from './patientSchedule.js';
+import { getPatientDate } from './adherencePatternService.js';
 import { db } from '../db/storageAdapter.js';
 import { EmailService } from './emailService.js';
 export class ReminderEngine {
@@ -12,6 +14,7 @@ export class ReminderEngine {
         this.processTick();
         this.timer = setInterval(() => this.processTick(), intervalMs);
     }
+    static get active() { return this.timer !== null; }
     static stop() {
         if (this.timer) {
             clearInterval(this.timer);
@@ -42,69 +45,30 @@ export class ReminderEngine {
      */
     static async checkUpcomingAndMissedDoses() {
         const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
         const patients = db.getAllPatientProfiles();
         for (const patient of patients) {
             const medications = db.getMedications(patient.id, true);
-            const todayRecords = db.getAdministrationRecords(patient.id, `${todayStr}T00:00:00.000Z`, `${todayStr}T23:59:59.999Z`);
+            const todayRecords = db.getAdministrationRecords(patient.id);
             const patientUser = db.getProfileById(patient.user_id);
             const careCircle = db.getCareCircleMembers(patient.id);
-            // Support patient timezone for accurate local time evaluation
-            const userTz = patientUser?.timezone || 'UTC';
-            let tzHour = now.getHours();
-            let tzMinute = now.getMinutes();
-            try {
-                const parts = new Intl.DateTimeFormat('en-US', {
-                    timeZone: userTz,
-                    hour: 'numeric',
-                    minute: 'numeric',
-                    hour12: false
-                }).formatToParts(now);
-                const hPart = parts.find(p => p.type === 'hour')?.value;
-                const mPart = parts.find(p => p.type === 'minute')?.value;
-                if (hPart !== undefined)
-                    tzHour = parseInt(hPart, 10) % 24;
-                if (mPart !== undefined)
-                    tzMinute = parseInt(mPart, 10);
-            }
-            catch {
-                // Fallback to local time if timezone string is unparseable
-            }
-            const currentMinutesInDay = tzHour * 60 + tzMinute;
+            const zone = db.getPatientTimeZone(patient.id);
+            const date = getPatientDate(now, zone);
+            const prefs = db.getNotificationPreferences(patient.user_id);
+            const leadMinutes = prefs?.upcoming_dose_minutes ?? 15;
+            const graceMinutes = prefs?.missed_dose_grace_minutes ?? 30;
             for (const med of medications) {
-                for (const timeStr of med.times_of_day) {
-                    const [hours, minutes] = timeStr.split(':').map(Number);
-                    const scheduledTime = new Date(now);
-                    scheduledTime.setHours(hours, minutes, 0, 0);
-                    const scheduledIso = scheduledTime.toISOString();
-                    // Find existing administration record for today's slot
-                    let record = todayRecords.find(r => r.medication_id === med.id &&
-                        new Date(r.scheduled_time).getHours() === hours &&
-                        new Date(r.scheduled_time).getMinutes() === minutes);
-                    // If no record exists, generate an initial upcoming record
-                    if (!record) {
-                        try {
-                            record = db.createAdministrationRecord({
-                                id: `dose-${med.id}-${scheduledIso}`,
-                                patient_id: patient.id,
-                                medication_id: med.id,
-                                scheduled_time: scheduledIso,
-                                status: 'upcoming',
-                                created_at: new Date().toISOString()
-                            });
-                        }
-                        catch {
-                            // already exists in concurrent tick
-                            record = db.getAdministrationRecordById(`dose-${med.id}-${scheduledIso}`);
-                        }
-                    }
+                if (med.frequency.toLowerCase() === 'as needed')
+                    continue;
+                for (const timeStr of new Set(med.times_of_day)) {
+                    const scheduledIso = localSlotInstant(date, timeStr, zone, true);
+                    if (!scheduledIso)
+                        continue;
+                    const record = todayRecords.find(r => r.medication_id === med.id && r.scheduled_time === scheduledIso);
                     if (!record)
                         continue;
-                    // Timezone-adjusted minutes difference
-                    const scheduledMinutesInDay = hours * 60 + minutes;
-                    const diffMinutes = currentMinutesInDay - scheduledMinutesInDay;
+                    const diffMinutes = (now.getTime() - Date.parse(scheduledIso)) / 60_000;
                     // 1. Upcoming reminder (15 minutes before)
-                    if (diffMinutes >= -15 && diffMinutes < 0 && record.status === 'upcoming') {
+                    if (diffMinutes >= -leadMinutes && diffMinutes < 0 && record.status === 'upcoming') {
                         const dedupKey = `upcoming-${med.id}-${scheduledIso}`;
                         if (patientUser) {
                             await EmailService.sendEmail({
@@ -112,7 +76,7 @@ export class ReminderEngine {
                                 recipientId: patientUser.id,
                                 patientId: patient.id,
                                 type: 'medication_reminder',
-                                subject: `Medication Reminder: ${med.name} in 15 minutes`,
+                                subject: `Medication Reminder: ${med.name} at ${timeStr}`,
                                 textContent: `Hello ${patientUser.full_name}, your dose of ${med.name} (${med.dosage}) is scheduled for ${timeStr}. Instructions: ${med.instructions || 'Take as prescribed.'}`,
                                 htmlContent: EmailService.buildEmailHtml(`Upcoming Dose: ${med.name}`, `<p>Hello <strong>${patientUser.full_name}</strong>,</p>
                    <p>Your dose of <strong>${med.name}</strong> (${med.dosage}) is scheduled for <strong>${timeStr}</strong>.</p>
@@ -123,12 +87,12 @@ export class ReminderEngine {
                         }
                     }
                     // 2. Due now notification
-                    if (diffMinutes >= 0 && diffMinutes < 15 && record.status === 'upcoming') {
+                    if (diffMinutes >= 0 && record.status === 'upcoming') {
                         db.updateAdministrationRecord(record.id, { status: 'due_now' });
                     }
                     // 3. Grace period passed (30+ minutes) and still not recorded -> mark as missed & escalate!
-                    if (diffMinutes >= 30 && (record.status === 'upcoming' || record.status === 'due_now')) {
-                        db.updateAdministrationRecord(record.id, { status: 'missed' });
+                    if (diffMinutes >= graceMinutes && (record.status === 'upcoming' || record.status === 'due_now')) {
+                        // An elapsed reminder window cannot establish whether a dose was taken.
                         const dedupKey = `missed-${med.id}-${scheduledIso}`;
                         const safetyNotice = 'IMPORTANT SAFETY NOTICE: Do not take a double dose to make up for a missed dose. Continue with your next scheduled dose or consult your healthcare provider or pharmacist for guidance.';
                         // Notify patient
@@ -182,7 +146,10 @@ export class ReminderEngine {
             const patientUser = db.getProfileById(patient.user_id);
             const careCircle = db.getCareCircleMembers(patient.id);
             for (const appt of appointments) {
-                const apptDateTime = new Date(`${appt.appointment_date}T${appt.appointment_time}`);
+                const instant = localSlotInstant(appt.appointment_date, appt.appointment_time, db.getPatientTimeZone(patient.id));
+                if (!instant)
+                    continue;
+                const apptDateTime = new Date(instant);
                 const hoursUntil = (apptDateTime.getTime() - now.getTime()) / (3600 * 1000);
                 // 24 Hour Reminder
                 if (hoursUntil > 0 && hoursUntil <= 24 && !appt.reminder_24h_sent) {

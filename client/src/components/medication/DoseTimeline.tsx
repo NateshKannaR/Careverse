@@ -119,6 +119,7 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
             const timeString = formatDoseTime(record.scheduled_time, timeZone);
             const isTaken = record.status === 'taken';
             const isDueOrUpcoming = record.status === 'due_now' || record.status === 'upcoming';
+            const isSkipped = record.status === 'skipped';
             const isMissed = record.status === 'missed';
 
             return (
@@ -187,7 +188,7 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
                   {/* Dose Action Buttons */}
                   {canManageMeds && (
                     <div className="flex min-w-0 flex-wrap items-center gap-2 xl:shrink-0">
-                      {!isTaken ? (
+                      {!isTaken && !isSkipped ? (
                         <>
                           <button
                             onClick={() => handleRecordDose(record.id, 'taken', med?.name || 'Medicine')}
@@ -208,7 +209,7 @@ export const DoseTimeline: React.FC<DoseTimelineProps> = ({
                       ) : (
                         <div className="text-xs font-bold text-emerald-700 flex items-center gap-1 bg-emerald-100/60 px-3 py-1.5 rounded-xl">
                           <CheckCircle className="w-4 h-4 text-emerald-600" />
-                          <span>Logged by {record.recorded_by_user?.full_name || 'Patient'}</span>
+                          <span>{record.recorded_by_user ? `Logged by ${record.recorded_by_user.full_name}` : 'Outcome recorded'}</span>
                         </div>
                       )}
                     </div>

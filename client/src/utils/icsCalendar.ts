@@ -6,6 +6,7 @@ export interface AppointmentForIcs {
   address?: string;
   appointment_date: string; // YYYY-MM-DD
   appointment_time: string; // HH:MM
+  starts_at?: string;
   appointment_purpose?: string;
   notes?: string;
 }
@@ -32,25 +33,14 @@ function sanitizeIcsText(text: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n');
+    .replace(/\r\n|\r|\n/g, '\\n');
 }
 
 /**
  * Generate RFC 5545 compliant iCalendar string for a medical appointment
  */
 export function generateAppointmentIcs(appointment: AppointmentForIcs): string {
-  const [hourStr, minuteStr] = (appointment.appointment_time || '09:00').split(':');
-  const [yearStr, monthStr, dayStr] = (appointment.appointment_date || '2026-11-20').split('-');
-
-  const startDate = new Date(
-    Date.UTC(
-      parseInt(yearStr, 10),
-      parseInt(monthStr, 10) - 1,
-      parseInt(dayStr, 10),
-      parseInt(hourStr, 10),
-      parseInt(minuteStr, 10)
-    )
-  );
+  const startDate = new Date(appointment.starts_at ?? `${appointment.appointment_date}T${appointment.appointment_time}:00Z`);
 
   // Default duration: 1 hour
   const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
@@ -93,13 +83,13 @@ export function generateAppointmentIcs(appointment: AppointmentForIcs): string {
     'BEGIN:VALARM',
     'TRIGGER:-PT24H',
     'ACTION:DISPLAY',
-    `DESCRIPTION:Reminder: Doctor Appointment Tomorrow with ${appointment.doctor_name}`,
+    `DESCRIPTION:Reminder: Doctor Appointment Tomorrow with ${sanitizeIcsText(appointment.doctor_name)}`,
     'END:VALARM',
     // 2-hour departure alarm
     'BEGIN:VALARM',
     'TRIGGER:-PT2H',
     'ACTION:DISPLAY',
-    `DESCRIPTION:Urgent: Doctor Appointment in 2 Hours with ${appointment.doctor_name}`,
+    `DESCRIPTION:Urgent: Doctor Appointment in 2 Hours with ${sanitizeIcsText(appointment.doctor_name)}`,
     'END:VALARM',
     'END:VEVENT',
     'END:VCALENDAR'

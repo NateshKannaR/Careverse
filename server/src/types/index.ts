@@ -135,6 +135,8 @@ export interface Medication {
   dosage: string;
   strength?: string;
   frequency: string;
+  archived_at?: string;
+  schedule_start?: string;
   times_of_day: string[]; // e.g. ["08:00", "20:00"]
   instructions?: string;
   prescribing_doctor?: string;

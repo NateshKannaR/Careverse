@@ -8,13 +8,14 @@ interface AddAppointmentModalProps {
   onClose: () => void;
   onAppointmentAdded: () => void;
   patientId?: string;
+  timeZone?: string;
 }
 
 export const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
   isOpen,
   onClose,
   onAppointmentAdded,
-  patientId
+  patientId, timeZone
 }) => {
   const { t } = useLanguage();
   const [doctorName, setDoctorName] = useState('');
@@ -26,8 +27,7 @@ export const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
   const [contactNumber, setContactNumber] = useState('');
   const [appointmentPurpose, setAppointmentPurpose] = useState('');
   const [checklistTasks, setChecklistTasks] = useState<string[]>([
-    'Carry current medication list and BP readings',
-    'Fasting blood sample at lab'
+    'Bring current medication list'
   ]);
   const [newTask, setNewTask] = useState('');
   const [notes, setNotes] = useState('');
@@ -96,7 +96,7 @@ export const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
               <h2 id="modal-appt-title" className="text-xl font-bold text-slate-900">
                 {t.appointments.scheduleAppointment}
               </h2>
-              <p className="text-xs text-slate-500">Add clinician consultation and preparation checklist</p>
+              <p className="text-xs text-slate-500">{timeZone ? `Visit times in ${timeZone}` : 'Enter the time on the patient’s appointment confirmation.'}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-11 min-w-11 shrink-0 p-2 text-slate-600 hover:text-slate-700 rounded-xl">

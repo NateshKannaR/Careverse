@@ -1,3 +1,4 @@
+import { visitSchedule } from './patientSchedule.js';
 import { db } from '../db/storageAdapter.js';
 import { CareScoreService, type DailyCareScoreBreakdown } from './careScoreService.js';
 
@@ -29,13 +30,7 @@ function scoreSummary(careScore: DailyCareScoreBreakdown): string {
 }
 
 function upcomingAppointments(patientId: string, score: DailyCareScoreBreakdown, now: Date) {
-  const time = new Intl.DateTimeFormat('en-GB', {
-    timeZone: score.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).format(now);
-  return db.getAppointments(patientId).filter(appointment => appointment.status === 'scheduled' && (
-    appointment.appointment_date > score.date
-    || (appointment.appointment_date === score.date && appointment.appointment_time >= time)
-  )).sort((a, b) => `${a.appointment_date}T${a.appointment_time}`.localeCompare(`${b.appointment_date}T${b.appointment_time}`));
+  return visitSchedule(db.getAppointments(patientId), score.timeZone, now).filter(visit => visit.is_upcoming);
 }
 
 export class CareBuddyService {

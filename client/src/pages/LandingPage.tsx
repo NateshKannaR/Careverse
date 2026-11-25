@@ -4,17 +4,10 @@ import { useAuth } from '../context/AuthContext.js';
 import {
   Heart,
   ShieldCheck,
-  BellRing,
-  Bot,
   Users,
   Calendar,
   Pill,
-  CheckCircle,
   ArrowRight,
-  ShieldAlert,
-  Clock,
-  Lock,
-  Activity,
   UserCheck
 } from 'lucide-react';
 import { UserRole } from '../types/index.js';
@@ -58,13 +51,11 @@ export const LandingPage: React.FC = () => {
               Keep medication check-ins, appointments, and family updates together so everyone knows what needs attention.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                to={user ? '/dashboard' : '/register'}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-teal-950 hover:bg-teal-50"
-              >
-                {user ? 'Open dashboard' : 'Create an account'}
-                <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
-              </Link>
+              <button type="button" disabled={opening !== undefined} onClick={() => user ? navigate('/dashboard') : openDemo('elderly')}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-teal-950 hover:bg-teal-50">
+                {user ? 'Open dashboard' : 'Try the patient demo'}<ArrowRight aria-hidden="true" size={16} />
+              </button>
+              {!user && <Link to="/register" className="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-white underline underline-offset-4">Create an account</Link>}
             </div>
           </div>
 
@@ -98,134 +89,24 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Core Ecosystem Value Pillars */}
-      <section className="py-10 sm:py-16 bg-white border-b border-slate-200">
-        <div className="care-width">
-          <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-950 tracking-tight mb-3">
-              Tools for everyone in the care circle
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base">
-              CAREVERSE combines simplicity for seniors with comprehensive coordination tools for their circle of support.
-            </p>
+      <section aria-labelledby="care-plan-preview" className="bg-white py-10 sm:py-16">
+        <div className="care-width grid items-center gap-6 lg:grid-cols-[0.75fr_1.25fr] lg:gap-12">
+          <div>
+            <h2 id="care-plan-preview" className="text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">One care plan for the day</h2>
+            <ul className="mt-5 divide-y divide-slate-200">
+              {[
+                { icon: Pill, title: 'Record a dose', detail: 'Review the schedule in the patient’s time zone and log the outcome.' },
+                { icon: Users, title: 'Hand off a refill', detail: 'A shared note tells family and caregivers which prescription needs follow-up.' },
+                { icon: Calendar, title: 'Prepare for a visit', detail: 'Check off preparation tasks and save the visit to your calendar.' },
+              ].map(({ icon: Icon, title, detail }) => <li key={title} className="flex items-start gap-3 py-3">
+                <Icon size={19} className="mt-0.5 shrink-0 text-teal-700" />
+                <div><h3 className="font-bold text-navy-950">{title}</h3><p className="mt-1 text-sm text-slate-600">{detail}</p></div>
+              </li>)}
+            </ul>
           </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
-            <div className="p-5 sm:p-7 bg-slate-50 rounded-2xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
-              <div className="w-14 h-14 rounded-2xl bg-teal-100 text-teal-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Clock className="w-7 h-7" />
-              </div>
-              <h3 className="text-lg font-bold text-navy-950 mb-2">Smart Medication Engine</h3>
-              <p className="text-sm text-slate-600 leading-relaxed mb-4">
-                Automated dosage tracking, 15-minute advance reminders, grace period escalations, and strict clinical safety warnings that prevent accidental double doses.
-              </p>
-              <ul className="text-xs text-slate-600 space-y-1.5 font-medium">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Refill prediction intelligence
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Multi-channel email delivery
-                </li>
-              </ul>
-            </div>
-
-            <div className="p-5 sm:p-7 bg-slate-50 rounded-2xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
-              <div className="w-14 h-14 rounded-2xl bg-sky-100 text-sky-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Users className="w-7 h-7" />
-              </div>
-              <h3 className="text-lg font-bold text-navy-950 mb-2">Family Care Circle</h3>
-              <p className="text-sm text-slate-600 leading-relaxed mb-4">
-                Connect adult children, relatives, and professional nurses with cryptographically hashed invitations and granular permissions for total peace of mind.
-              </p>
-              <ul className="text-xs text-slate-600 space-y-1.5 font-medium">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Patient data isolation
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Automated daily family digest
-                </li>
-              </ul>
-            </div>
-
-            <div className="p-5 sm:p-7 bg-slate-50 rounded-2xl border border-slate-200 hover:border-teal-300 transition-all shadow-card group">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Bot className="w-7 h-7" />
-              </div>
-              <h3 className="text-lg font-bold text-navy-950 mb-2">CareBuddy AI Companion</h3>
-              <p className="text-sm text-slate-600 leading-relaxed mb-4">
-                A contextual healthcare assistant that summarizes daily routines, explains complex medical terms in plain English, and suggests questions to ask clinicians.
-              </p>
-              <ul className="text-xs text-slate-600 space-y-1.5 font-medium">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Web Speech read-aloud support
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Strict medical safety disclaimers
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Security & Accessibility Section */}
-      <section className="py-10 sm:py-16 bg-slate-900 text-white">
-        <div className="care-width">
-          <div className="grid min-w-0 grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-bold uppercase tracking-wider mb-4">
-                <Lock className="w-4 h-4 text-teal-400" /> Privacy and accessibility
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
-                Engineered for Healthcare Privacy & Accessibility
-              </h2>
-              <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-6">
-                Built from the ground up with Supabase PostgreSQL Row Level Security (RLS), SHA-256 token hashing, strict patient data isolation, and comprehensive audit trails.
-              </p>
-
-              <div className="space-y-3.5">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-bold text-sm text-white">WCAG 2.2 AA Accessibility</h4>
-                    <p className="text-xs text-slate-400">High contrast mode, 125% large text scaling, audible alerts, and multilingual support (English, Tamil, Hindi).</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Activity className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-bold text-sm text-white">Transparent Daily Care Score</h4>
-                    <p className="text-xs text-slate-400">A clear routine completion indicator based on actual recorded events, clearly demarcated from clinical diagnosis.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <ShieldAlert className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-bold text-sm text-white">Emergency SOS Assistance</h4>
-                    <p className="text-xs text-slate-400">One-tap rapid alerting for emergency contacts, accidental activation cancellation, and local 911 / 112 dialing instructions.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-800/80 p-5 sm:p-8 rounded-2xl border border-slate-700 shadow-2xl">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <BellRing className="w-5 h-5 text-teal-400" />
-                Notification Engine Highlights
-              </h3>
-              <div className="space-y-4 text-xs text-slate-300">
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-700">
-                  <span className="font-bold text-teal-300">Background Engine:</span> Runs idempotent cron evaluations checking for due doses, grace periods, and appointment alerts.
-                </div>
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-700">
-                  <span className="font-bold text-teal-300">Caregiver Escalation:</span> If a vital dose is unrecorded beyond 30 minutes, authorized caregivers receive alert emails.
-                </div>
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-700">
-                  <span className="font-bold text-teal-300">Resend & Simulator:</span> Supports live production email dispatch via Resend SDK or the zero-config in-app visual simulator.
-                </div>
-              </div>
-            </div>
-          </div>
+          <img src={new URL('../../../docs/screenshots/daily-care-plan.jpg', import.meta.url).href}
+            alt="Eleanor’s fictional care plan with dose schedule, wellbeing check-in, next visit and care resources"
+            width="1440" height="920" loading="lazy" className="w-full rounded-2xl border border-slate-200 shadow-card" />
         </div>
       </section>
 
@@ -237,7 +118,7 @@ export const LandingPage: React.FC = () => {
             <span className="font-bold text-slate-800">CAREVERSE Ecosystem</span>
           </div>
           <div>
-            Built with React, TypeScript, Tailwind CSS, Express, and Supabase PostgreSQL.
+            Public demo with fictional patient records.
           </div>
         </div>
       </footer>

@@ -1,3 +1,5 @@
+import { useSearchParams } from 'react-router-dom';
+import { RefillPredictionWidget } from '../components/medication/RefillPredictionWidget.js';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
@@ -24,7 +26,11 @@ export const MedicationsPage: React.FC = () => {
   const { t } = useLanguage();
   const [doseTimeZone, setDoseTimeZone] = useState<string>();
 
-  const [activeTab, setActiveTab] = useState<'timeline' | 'all'>('timeline');
+  const [params, setParams] = useSearchParams();
+  const activeTab = params.get('view') || 'timeline';
+  const setActiveTab = (view: string) => setParams(view === 'timeline' ? {} : { view });
+  const [canManage, setCanManage] = useState(false);
+  const [error, setError] = useState('');
   const [medications, setMedications] = useState<any[]>([]);
   const [todayDoses, setTodayDoses] = useState<any[]>([]);
   const [search, setSearch] = useState('');
@@ -33,18 +39,20 @@ export const MedicationsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchMedications = async () => {
+    setError('');
     try {
       const [medsRes, dosesRes] = await Promise.all([
         api.medications.getAll(user?.patient_id),
         api.medications.getTodayDoses(user?.patient_id)
       ]);
-      if (medsRes) setMedications(medsRes.medications || []);
+      setCanManage(medsRes.can_manage);
+      setMedications(medsRes.medications || []);
       if (dosesRes) {
         setTodayDoses(dosesRes.records || []);
         setDoseTimeZone(dosesRes.time_zone);
       }
     } catch (err) {
-      console.error(err);
+      setError('Unable to load prescriptions.');
     } finally {
       setLoading(false);
     }
@@ -74,7 +82,7 @@ export const MedicationsPage: React.FC = () => {
     }
   };
 
-  const lowSupplyMeds = medications.filter(m => m.remaining_supply !== undefined && m.remaining_supply <= 5);
+  const lowSupplyMeds = medications.filter(m => m.is_active && m.remaining_supply !== undefined && m.remaining_supply <= 5);
 
   const filteredMeds = medications.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -98,17 +106,17 @@ export const MedicationsPage: React.FC = () => {
           <p className="text-sm text-slate-500 mt-1">{t.medications.subtitle}</p>
         </div>
 
-        <button
+        {canManage && <button
           onClick={() => setAddModalOpen(true)}
           className="px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md transition flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>{t.medications.addMedication}</span>
-        </button>
+        </button>}
       </div>
 
       {/* Refill Intelligence Warning Banner (if low supply) */}
-      {lowSupplyMeds.length > 0 && (
+      {activeTab !== 'supply' && lowSupplyMeds.length > 0 && (
         <div className="p-4 sm:p-5 bg-amber-50 border-2 border-amber-300 rounded-3xl text-xs text-amber-900 shadow-sm flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
@@ -127,7 +135,7 @@ export const MedicationsPage: React.FC = () => {
       )}
 
       {/* View Toggle Tabs */}
-      <div className="grid grid-cols-2 gap-1 border-b border-slate-200 sm:flex sm:items-center sm:gap-2">
+      <div className="flex flex-wrap gap-1 border-b border-slate-200 sm:flex sm:items-center sm:gap-2">
         <button
           onClick={() => setActiveTab('timeline')}
           className={`min-h-11 min-w-0 px-2 py-2 text-left text-sm font-bold border-b-2 transition flex items-center gap-2 sm:px-4 ${
@@ -150,11 +158,14 @@ export const MedicationsPage: React.FC = () => {
           <Layers aria-hidden="true" className="w-4 h-4 shrink-0" />
           <span className="min-w-0 break-words">{t.medications.allPrescriptions} ({medications.length})</span>
         </button>
+        <button type="button" aria-pressed={activeTab === 'supply'} onClick={() => setActiveTab('supply')}
+          className={`min-h-11 px-3 text-sm font-bold border-b-2 ${activeTab === 'supply' ? 'border-teal-600 text-teal-800' : 'border-transparent text-slate-600'}`}>Medication supply</button>
       </div>
 
-      {activeTab === 'timeline' ? (
+      {error && <p role="alert">{error} <button onClick={fetchMedications} className="font-bold underline">Retry</button></p>}
+      {activeTab === 'supply' ? <RefillPredictionWidget patientId={user?.patient_id} /> : loading ? <p role="status">Loading prescriptions…</p> : error ? null : activeTab !== 'all' ? (
         <div className="bg-white rounded-3xl p-4 sm:p-7 border border-slate-200 shadow-card">
-          <DoseTimeline records={todayDoses} onDoseUpdated={fetchMedications} canManageMeds={true} timeZone={doseTimeZone} />
+          <DoseTimeline records={todayDoses} onDoseUpdated={fetchMedications} canManageMeds={canManage} timeZone={doseTimeZone} />
         </div>
       ) : (
         <div className="space-y-6">
@@ -188,6 +199,7 @@ export const MedicationsPage: React.FC = () => {
             </div>
           </div>
 
+          {!filteredMeds.length && <p role="status" className="text-sm text-slate-600">No prescriptions match this view.</p>}
           {/* Prescriptions Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredMeds.map(med => (
@@ -254,7 +266,7 @@ export const MedicationsPage: React.FC = () => {
                   </p>
                 )}
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                {canManage && <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                   <button
                     onClick={() => handleTogglePause(med.id)}
                     className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-teal-700 transition"
@@ -269,19 +281,19 @@ export const MedicationsPage: React.FC = () => {
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-                </div>
+                </div>}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <AddMedicationModal
+      {addModalOpen && <AddMedicationModal
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onMedicationAdded={fetchMedications}
         patientId={user?.patient_id}
-      />
+      />}
 
       <CareBuddyWidget patientId={user?.patient_id} />
     </div>

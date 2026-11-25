@@ -1,3 +1,5 @@
+import { localSlotInstant } from '../services/patientSchedule.js';
+import { getPatientDate } from '../services/adherencePatternService.js';
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
@@ -111,7 +113,8 @@ class StorageAdapter {
 
   public seedInitialData() {
     const passwordHash = bcrypt.hashSync('Demo1234!', 10);
-    const today = new Date().toISOString().split('T')[0];
+    const demoZone = 'America/New_York';
+    const today = getPatientDate(new Date(), demoZone);
 
     // Profiles
     const eleanor: UserProfile = {
@@ -360,10 +363,10 @@ class StorageAdapter {
     this.store.medications = [med1, med2, med3, med4];
 
     // Today's Doses
-    const morningIso = `${today}T08:00:00.000Z`;
-    const noonIso = `${today}T12:00:00.000Z`;
-    const eveningIso = `${today}T19:00:00.000Z`;
-    const nightIso = `${today}T21:00:00.000Z`;
+    const morningIso = localSlotInstant(today, '08:00', demoZone)!;
+    const noonIso = localSlotInstant(today, '12:00', demoZone)!;
+    const eveningIso = localSlotInstant(today, '19:00', demoZone)!;
+    const nightIso = localSlotInstant(today, '21:00', demoZone)!;
 
     this.store.administrationRecords = [
       {
@@ -371,7 +374,7 @@ class StorageAdapter {
         patient_id: patientProfile.id,
         medication_id: med1.id,
         scheduled_time: morningIso,
-        actual_time: `${today}T08:05:00.000Z`,
+        actual_time: localSlotInstant(today, '08:05', demoZone)!,
         status: 'taken',
         recorded_by: eleanor.id,
         notes: 'Taken with warm oatmeal.',
@@ -382,7 +385,7 @@ class StorageAdapter {
         patient_id: patientProfile.id,
         medication_id: med2.id,
         scheduled_time: morningIso,
-        actual_time: `${today}T08:06:00.000Z`,
+        actual_time: localSlotInstant(today, '08:06', demoZone)!,
         status: 'taken',
         recorded_by: eleanor.id,
         notes: 'Taken with breakfast.',
@@ -393,7 +396,7 @@ class StorageAdapter {
         patient_id: patientProfile.id,
         medication_id: med4.id,
         scheduled_time: noonIso,
-        actual_time: `${today}T12:15:00.000Z`,
+        actual_time: localSlotInstant(today, '12:15', demoZone)!,
         status: 'taken',
         recorded_by: sarah.id,
         notes: 'Administered during lunch visit.',
@@ -416,6 +419,15 @@ class StorageAdapter {
         created_at: new Date().toISOString()
       }
     ];
+
+    for (const record of this.store.administrationRecords) {
+      if (record.actual_time && Date.parse(record.actual_time) > Date.now()) {
+        record.status = 'upcoming';
+        delete record.actual_time;
+        delete record.recorded_by;
+        delete record.notes;
+      }
+    }
 
     // Fictional dose history for the public demo, stored as ordinary records.
     const demoHistory = [
@@ -809,7 +821,7 @@ class StorageAdapter {
   // --- Medications ---
   public getMedications(patientId: string, activeOnly: boolean = false): Medication[] {
     return this.store.medications.filter(
-      m => m.patient_id === patientId && (!activeOnly || m.is_active)
+      m => m.patient_id === patientId && !m.archived_at && (!activeOnly || m.is_active)
     );
   }
 
@@ -818,6 +830,7 @@ class StorageAdapter {
   }
 
   public createMedication(medication: Medication): Medication {
+    medication.schedule_start = medication.created_at ?? new Date().toISOString();
     this.store.medications.push(medication);
     this.persist();
     return medication;
@@ -826,6 +839,14 @@ class StorageAdapter {
   public updateMedication(id: string, updates: Partial<Medication>): Medication | null {
     const idx = this.store.medications.findIndex(m => m.id === id);
     if (idx === -1) return null;
+    const previous = this.store.medications[idx];
+    if (updates.is_active === false || updates.times_of_day || updates.frequency) {
+      this.store.administrationRecords = this.store.administrationRecords.filter(record =>
+        record.medication_id !== id || record.status !== 'upcoming' || Date.parse(record.scheduled_time) < Date.now());
+    }
+    if ((!previous.is_active && updates.is_active) || updates.times_of_day || updates.frequency) {
+      updates = { ...updates, schedule_start: new Date().toISOString() };
+    }
     this.store.medications[idx] = {
       ...this.store.medications[idx],
       ...updates,
@@ -838,15 +859,39 @@ class StorageAdapter {
   public deleteMedication(id: string): boolean {
     const idx = this.store.medications.findIndex(m => m.id === id);
     if (idx === -1) return false;
-    this.store.medications.splice(idx, 1);
-    // Also remove associated administration records
-    this.store.administrationRecords = this.store.administrationRecords.filter(r => r.medication_id !== id);
-    this.persist();
+    this.updateMedication(id, { is_active: false, archived_at: new Date().toISOString() });
     return true;
   }
 
   // --- Administration Records (Doses) ---
   public getAdministrationRecords(patientId: string, startDate?: string, endDate?: string): MedicationAdministrationRecord[] {
+    // Materialize this patient's local day on reads as well as background ticks.
+    // Serverless deployments can serve a schedule without an always-on timer.
+    const now = new Date();
+    const zone = this.getPatientTimeZone(patientId);
+    const day = getPatientDate(now, zone);
+    const stored = this.store.administrationRecords.filter(record => record.patient_id === patientId);
+    const slots = new Set(stored.map(record => record.medication_id + '/' + Date.parse(record.scheduled_time)));
+    let changed = false;
+    for (const med of this.getMedications(patientId, true)) {
+      if (med.frequency.toLowerCase() === 'as needed') continue;
+      for (const time of new Set(med.times_of_day)) {
+        const instant = localSlotInstant(day, time, zone, true);
+        if (!instant || (med.schedule_start && Date.parse(instant) < Date.parse(med.schedule_start))) continue;
+        if (slots.has(med.id + '/' + Date.parse(instant))) continue;
+        // Older demo seeds stored their five initial wall times as UTC.
+        const legacy = stored.some(record => record.id.startsWith('rrrrrrrr-') &&
+          record.medication_id === med.id && record.scheduled_time === day + 'T' + time + ':00.000Z');
+        if (legacy) continue;
+        slots.add(med.id + '/' + Date.parse(instant));
+        this.store.administrationRecords.push({
+          id: 'dose-' + med.id + '-' + instant, patient_id: patientId, medication_id: med.id,
+          scheduled_time: instant, status: 'upcoming', created_at: now.toISOString(),
+        });
+        changed = true;
+      }
+    }
+    if (changed) this.persist();
     let records = this.store.administrationRecords.filter(r => r.patient_id === patientId);
     if (startDate) {
       records = records.filter(r => r.scheduled_time >= startDate);
@@ -929,7 +974,12 @@ class StorageAdapter {
   // --- Wellbeing Check-ins ---
   public getPatientTimeZone(patientId: string): string {
     const patient = this.getPatientProfileById(patientId);
-    return (patient && this.getProfileById(patient.user_id)?.timezone) || 'UTC';
+    const zone = (patient && this.getProfileById(patient.user_id)?.timezone) || 'UTC';
+    try {
+      return new Intl.DateTimeFormat('en', { timeZone: zone }).resolvedOptions().timeZone;
+    } catch {
+      return 'UTC';
+    }
   }
 
   public getWellbeingCheckinForDate(patientId: string, date: string): WellbeingCheckin | undefined {

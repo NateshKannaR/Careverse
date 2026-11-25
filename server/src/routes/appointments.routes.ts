@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/storageAdapter.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
-import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
+import { localSlotInstant, visitSchedule } from '../services/patientSchedule.js';
+import { checkPatientAccess, verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { Appointment } from '../types/index.js';
 
 const router = Router();
@@ -15,8 +16,8 @@ const appointmentSchema = z.object({
   specialty: z.string().min(1, 'Specialty is required'),
   hospital_clinic: z.string().min(1, 'Hospital or clinic is required'),
   address: z.string().optional(),
-  appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
-  appointment_time: z.string().min(1, 'Time is required'),
+  appointment_date: z.string().date(),
+  appointment_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   contact_number: z.string().optional(),
   appointment_purpose: z.string().min(1, 'Purpose is required'),
   preparation_checklist: z.array(z.object({
@@ -57,10 +58,12 @@ router.get('/', (req: Request, res: Response): void => {
     appointments = appointments.filter(a => a.status === statusFilter);
   }
 
-  // Sort upcoming first
-  appointments.sort((a, b) => `${a.appointment_date} ${a.appointment_time}`.localeCompare(`${b.appointment_date} ${b.appointment_time}`));
-
-  res.json({ appointments });
+  const time_zone = db.getPatientTimeZone(patientId);
+  res.json({
+    appointments: visitSchedule(appointments, time_zone, new Date()),
+    time_zone,
+    can_manage: checkPatientAccess(req.user!, patientId, 'manage_appointments').allowed,
+  });
 });
 
 // POST /api/appointments
@@ -78,6 +81,11 @@ router.post('/', (req: Request, res: Response): void => {
   }
 
   if (!verifyPatientAccess(req, res, patientId, 'manage_appointments')) return;
+
+  if (!localSlotInstant(parsed.data.appointment_date, parsed.data.appointment_time, db.getPatientTimeZone(patientId))) {
+    res.status(400).json({ error: 'Choose a valid date and time in the patient’s time zone.' });
+    return;
+  }
 
   const newAppointment: Appointment = {
     ...parsed.data,
@@ -123,7 +131,13 @@ router.put('/:id', (req: Request, res: Response): void => {
 
   if (!verifyPatientAccess(req, res, appt.patient_id, 'manage_appointments')) return;
 
-  const updated = db.updateAppointment(appt.id, req.body);
+  const parsed = appointmentSchema.omit({ patient_id: true }).partial().safeParse(req.body);
+  if (!parsed.success || !localSlotInstant(parsed.data.appointment_date ?? appt.appointment_date,
+    parsed.data.appointment_time ?? appt.appointment_time, db.getPatientTimeZone(appt.patient_id))) {
+    res.status(400).json({ error: 'Choose a valid visit date, time and status.' });
+    return;
+  }
+  const updated = db.updateAppointment(appt.id, parsed.data);
 
   db.logAudit({
     actor_id: req.user?.id,

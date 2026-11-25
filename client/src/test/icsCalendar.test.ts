@@ -38,6 +38,12 @@ describe('RFC 5545 iCalendar (.ics) Generator Tests', () => {
     expect(icsContent).toContain('DTEND:20261120T153000Z');
   });
 
+  it('uses the patient-local instant supplied by the appointment list across UTC midnight', () => {
+    const calendar = generateAppointmentIcs({ ...sampleAppointment, appointment_time: '21:30', starts_at: '2026-11-21T02:30:00Z' });
+    expect(calendar).toContain('DTSTART:20261121T023000Z');
+    expect(calendar).toContain('DTEND:20261121T033000Z');
+  });
+
   it('should include dual VALARM triggers: 24h advance and 2h departure alarm', () => {
     const icsContent = generateAppointmentIcs(sampleAppointment);
 

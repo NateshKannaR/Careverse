@@ -44,11 +44,13 @@ router.get('/', (req, res) => {
         res.status(400).json({ error: 'Patient ID is required.' });
         return;
     }
+    if (!verifyPatientAccess(req, res, patientId, 'view'))
+        return;
     const members = db.getCareCircleMembers(patientId);
     const invitations = db.getInvitationsForPatient(patientId);
     res.json({
         members,
-        invitations: invitations.filter(i => i.status === 'pending')
+        invitations: req.user?.patient_id === patientId || req.user?.role === 'admin' ? invitations.filter(i => i.status === 'pending').map(({ token_hash, ...details }) => details) : []
     });
 });
 // POST /api/care-circle/invite - generate secure invitation token

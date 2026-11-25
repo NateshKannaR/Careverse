@@ -41,7 +41,7 @@ export function predictAllRefills(
   now: Date = new Date()
 ): RefillForecast[] {
   return medications
-    .filter(m => m.is_active)
+    .filter(m => m.is_active && m.frequency.toLowerCase() !== 'as needed')
     .map(med => predictMedicationRefill(med, undefined, now))
     .sort((a, b) => a.days_remaining - b.days_remaining);
 }

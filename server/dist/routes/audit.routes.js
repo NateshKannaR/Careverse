@@ -39,6 +39,8 @@ router.get('/logs', (req, res) => {
         res.status(400).json({ error: 'Patient ID is required.' });
         return;
     }
+    if (!verifyPatientAccess(req, res, patientId, 'view'))
+        return;
     const logs = db.getAuditLogs(patientId);
     res.json({ logs });
 });

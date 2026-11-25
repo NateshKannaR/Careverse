@@ -1,4 +1,5 @@
 import { formatDoseTime } from '../utils/doseTime.js';
+import { useQuery } from '@tanstack/react-query';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
@@ -21,14 +22,9 @@ import {
 export const CaregiverDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [doseTimeZone, setDoseTimeZone] = useState<string>();
-
   const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  const [doses, setDoses] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [careNotes, setCareNotes] = useState<any[]>([]);
-
+  const [noteMessage, setNoteMessage] = useState('');
   // Care note form
   const [noteTitle, setNoteTitle] = useState('');
   const [noteCategory, setNoteCategory] = useState<'vitals' | 'general' | 'medical' | 'diet'>('vitals');
@@ -46,36 +42,24 @@ export const CaregiverDashboardPage: React.FC = () => {
     }).catch(console.error);
   }, []);
 
-  const fetchPatientDetails = async (patientId: string) => {
-    if (!patientId) return;
-    try {
-      const [dosesRes, apptsRes, notesRes] = await Promise.all([
-        api.medications.getTodayDoses(patientId),
-        api.appointments.getAll(patientId),
-        api.careNotes.getAll(patientId)
+  const details = useQuery({
+    queryKey: ['caregiver-care-plan', user?.id, selectedPatientId],
+    enabled: Boolean(selectedPatientId),
+    staleTime: 0,
+    queryFn: async () => {
+      const [timeline, notes] = await Promise.all([
+        api.medications.getTodayDoses(selectedPatientId), api.careNotes.getAll(selectedPatientId),
       ]);
-
-      if (dosesRes) {
-        setDoses(dosesRes.records || []);
-        setDoseTimeZone(dosesRes.time_zone);
-      }
-      if (apptsRes) setAppointments(apptsRes.appointments || []);
-      if (notesRes) setCareNotes(notesRes.notes || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedPatientId) {
-      fetchPatientDetails(selectedPatientId);
-    }
-  }, [selectedPatientId]);
-
+      return { timeline, notes };
+    },
+  });
+  const doses: any[] = details.data?.timeline.records ?? [];
+  const doseTimeZone: string | undefined = details.data?.timeline.time_zone;
+  const careNotes: any[] = details.data?.notes.notes ?? [];
   const handleRecordDose = async (doseId: string, status: 'taken' | 'skipped') => {
     try {
-      await api.medications.recordDose(doseId, status, 'Administered by nurse');
-      fetchPatientDetails(selectedPatientId);
+      await api.medications.recordDose(doseId, status, status === 'taken' ? 'Recorded as taken by caregiver' : 'Recorded as skipped by caregiver');
+      await details.refetch();
     } catch (err: any) {
       alert(err.message || 'Error recording dose');
     }
@@ -93,10 +77,11 @@ export const CaregiverDashboardPage: React.FC = () => {
         content: noteContent.trim(),
         is_priority: isPriority
       });
+      setNoteMessage('Care note saved to the shared handoff.');
       setNoteTitle('');
       setNoteContent('');
       setIsPriority(false);
-      fetchPatientDetails(selectedPatientId);
+      await details.refetch();
     } catch (err: any) {
       alert(err.message || 'Failed to add care note');
     } finally {
@@ -131,7 +116,7 @@ export const CaregiverDashboardPage: React.FC = () => {
           <select
             id="caregiver-patient"
             value={selectedPatientId}
-            onChange={e => setSelectedPatientId(e.target.value)}
+            onChange={e => { setSelectedPatientId(e.target.value); setNoteTitle(''); setNoteContent(''); setNoteMessage(''); setIsPriority(false); }}
             className="min-h-11 w-full min-w-0 rounded-xl bg-emerald-950 px-3 py-2 text-sm font-bold text-white"
           >
             {patients.map(p => (
@@ -149,28 +134,30 @@ export const CaregiverDashboardPage: React.FC = () => {
       </div>
 
       {/* Main Grid: Pending Doses, Missed Alerts, and Care Notes */}
-      <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
+      {details.isError && <p role="alert">Unable to load this patient’s care plan. <button className="font-semibold underline" onClick={() => details.refetch()}>Retry</button></p>}
+      {selectedPatientId && details.isPending && <p role="status">Loading care plan…</p>}
+      {details.data && <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:gap-8">
         <div className="min-w-0 lg:col-span-2 space-y-6">
           {/* Missed Doses Alert Banner (if any) */}
           {missedDoses.length > 0 && (
             <div className="p-5 bg-rose-50 border-2 border-rose-300 rounded-3xl text-xs text-rose-900 shadow-sm">
               <div className="flex items-center gap-2 font-black text-sm mb-2 text-rose-700">
                 <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                <span>Attention Required: {missedDoses.length} Potentially Missed Doses</span>
+                <span>Attention Required: {missedDoses.length} Recorded Missed Doses</span>
               </div>
               <p className="mb-3 leading-relaxed">
-                The following scheduled doses have passed their 30-minute grace period without an administration record. Please check in with the patient immediately.
+                These doses have a missed outcome on file. Check the record with the patient or their care team.
               </p>
               <div className="space-y-2">
                 {missedDoses.map(d => (
                   <div key={d.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-rose-200">
                     <span className="font-bold">{d.medication?.name} ({d.medication?.dosage})</span>
-                    <button
+                    {activePatient?.permissions?.can_manage_meds && <button
                       onClick={() => handleRecordDose(d.id, 'taken')}
                       className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px]"
                     >
-                      Administer Now
-                    </button>
+                      Record as taken
+                    </button>}
                   </div>
                 ))}
               </div>
@@ -187,7 +174,7 @@ export const CaregiverDashboardPage: React.FC = () => {
 
             {pendingDoses.length === 0 ? (
               <div className="text-center py-10 text-slate-400 text-xs">
-                All scheduled medication doses for today have been administered!
+                No doses awaiting a record in this list.
               </div>
             ) : (
               <div className="space-y-3">
@@ -213,12 +200,12 @@ export const CaregiverDashboardPage: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    {activePatient?.permissions?.can_manage_meds && <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleRecordDose(record.id, 'taken')}
                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5"
                       >
-                        <CheckCircle2 className="w-4 h-4" /> Administer
+                        <CheckCircle2 className="w-4 h-4" /> Record taken
                       </button>
                       <button
                         onClick={() => handleRecordDose(record.id, 'skipped')}
@@ -226,7 +213,7 @@ export const CaregiverDashboardPage: React.FC = () => {
                       >
                         Skip
                       </button>
-                    </div>
+                    </div>}
                   </div>
                 ))}
               </div>
@@ -236,7 +223,7 @@ export const CaregiverDashboardPage: React.FC = () => {
 
         {/* Right Column: Add Clinical / Vitals Care Note */}
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
+          {activePatient?.permissions?.can_add_notes && <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-card">
             <h3 className="font-bold text-sm text-navy-950 mb-1 flex items-center gap-2">
               <FilePlus className="w-4 h-4 text-teal-600" />
               <span>Record Clinical Care Note / Vitals</span>
@@ -303,11 +290,20 @@ export const CaregiverDashboardPage: React.FC = () => {
                 <span>Save Care Note</span>
               </button>
             </form>
-          </div>
+            {noteMessage && <p role="status" className="mt-2 text-sm text-teal-800">{noteMessage}</p>}
+          </div>}
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+            <h2 className="font-bold text-navy-950">Shared care notes</h2>
+            <ul className="mt-2 divide-y divide-slate-200">{careNotes.map(note => <li key={note.id} className="break-words py-3 text-sm">
+              <strong>{note.title}</strong><p className="mt-1 text-slate-700">{note.content}</p>
+              <p className="mt-1 text-xs text-slate-600">{note.author?.full_name}</p>
+            </li>)}</ul>
+            {!careNotes.length && <p className="mt-2 text-sm">No notes recorded.</p>}
+          </section>
         </div>
-      </div>
+      </div>}
 
-      <CareBuddyWidget patientId={selectedPatientId} />
+      {selectedPatientId && <CareBuddyWidget key={selectedPatientId} patientId={selectedPatientId} />}
     </div>
   );
 };

@@ -27,12 +27,19 @@ export const AppointmentsPage: React.FC = () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const [zone, setZone] = useState('');
+  const [canManage, setCanManage] = useState(false);
+  const [error, setError] = useState('');
+
   const fetchAppointments = async () => {
+    setError('');
     try {
       const res = await api.appointments.getAll(user?.patient_id);
-      if (res) setAppointments(res.appointments || []);
+      setAppointments(res.appointments);
+      setZone(res.time_zone);
+      setCanManage(res.can_manage);
     } catch (err) {
-      console.error(err);
+      setError('Your visits could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -62,8 +69,8 @@ export const AppointmentsPage: React.FC = () => {
     }
   };
 
-  const upcomingAppts = appointments.filter(a => a.status === 'scheduled');
-  const pastAppts = appointments.filter(a => a.status !== 'scheduled');
+  const upcomingAppts = appointments.filter(a => a.is_upcoming);
+  const pastAppts = appointments.filter(a => !a.is_upcoming).reverse();
 
   return (
     <div className="care-page animate-fade-in">
@@ -77,22 +84,17 @@ export const AppointmentsPage: React.FC = () => {
           <p className="text-sm text-slate-500 mt-1">{t.appointments.subtitle}</p>
         </div>
 
-        <button
+        {canManage && <button
           onClick={() => setAddModalOpen(true)}
           className="px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md transition flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>{t.appointments.scheduleAppointment}</span>
-        </button>
+        </button>}
       </div>
 
-      {/* Reminder Notification Notice Banner */}
-      <div className="p-4 bg-teal-50 rounded-2xl border border-teal-200 text-xs text-teal-900 flex items-center gap-3">
-        <Clock className="w-5 h-5 text-teal-700 flex-shrink-0" />
-        <div>
-          <strong>Automatic Email Reminders:</strong> {t.appointments.reminderNotice}
-        </div>
-      </div>
+      {zone && <p className="flex items-center gap-2 text-sm text-slate-600"><Clock size={16} />Visit times in {zone}</p>}
+      {error && <p role="alert">{error} <button className="font-bold underline" onClick={fetchAppointments}>Retry</button></p>}
 
       {/* Upcoming Consultations */}
       <div className="space-y-4">
@@ -100,9 +102,9 @@ export const AppointmentsPage: React.FC = () => {
           <span>{t.appointments.upcoming} ({upcomingAppts.length})</span>
         </h2>
 
-        {upcomingAppts.length === 0 ? (
+        {loading ? <p role="status">Loading visits…</p> : error ? null : upcomingAppts.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-3xl border border-slate-200 p-6 text-slate-400 text-xs">
-            No upcoming medical appointments. Click "Schedule Appointment" to add one.
+            No upcoming visits scheduled.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -152,7 +154,7 @@ export const AppointmentsPage: React.FC = () => {
                       <div className="space-y-1.5">
                         {appt.preparation_checklist.map((task: any, idx: number) => (
                           <button
-                            key={idx}
+                            key={idx} aria-pressed={task.completed}
                             onClick={() => handleToggleChecklist(appt.id, idx, task.completed)}
                             className="w-full flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 text-left text-xs transition"
                           >
@@ -181,12 +183,12 @@ export const AppointmentsPage: React.FC = () => {
                     <span>Add to Calendar (.ics)</span>
                   </button>
 
-                  <button
+                  {canManage && <button
                     onClick={() => handleCancelAppointment(appt.id)}
                     className="text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 transition"
                   >
                     <XCircle className="w-3.5 h-3.5" /> Cancel Visit
-                  </button>
+                  </button>}
                 </div>
               </div>
             ))}
@@ -194,12 +196,25 @@ export const AppointmentsPage: React.FC = () => {
         )}
       </div>
 
-      <AddAppointmentModal
+      {pastAppts.length > 0 && <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6">
+        <h2 className="text-lg font-bold text-navy-950">Visit history</h2>
+        <ul className="mt-3 divide-y divide-slate-200">{pastAppts.map(visit => (
+          <li key={visit.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+            <div><strong>{visit.doctor_name}</strong><p className="text-slate-600">{visit.appointment_date} · {visit.appointment_time} · {visit.hospital_clinic}</p></div>
+            <span className="rounded-lg bg-slate-100 px-2 py-1 font-semibold capitalize">{visit.status === 'scheduled' ? 'Attendance unconfirmed' : visit.status}</span>
+            {canManage && visit.status === 'scheduled' && <button className="min-h-11 font-semibold text-teal-800" onClick={async () => {
+              try { await api.appointments.update(visit.id, { status: 'completed' }); await fetchAppointments(); }
+              catch { setError('Unable to confirm this visit.'); }
+            }}>Confirm attended</button>}
+          </li>
+        ))}</ul>
+      </section>}
+      {addModalOpen && <AddAppointmentModal
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onAppointmentAdded={fetchAppointments}
-        patientId={user?.patient_id}
-      />
+        patientId={user?.patient_id} timeZone={zone}
+      />}
 
       <CareBuddyWidget patientId={user?.patient_id} />
     </div>

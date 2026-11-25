@@ -1,10 +1,11 @@
+import { visitSchedule } from './patientSchedule.js';
 import { db } from '../db/storageAdapter.js';
 import { getDailyDoseEvidence } from './adherencePatternService.js';
 export class CareScoreService {
     static calculateDailyCareScore(patientId, date, now = new Date()) {
         const evidence = getDailyDoseEvidence(db.getAdministrationRecords(patientId), now, db.getPatientTimeZone(patientId), date);
         const checkin = db.getWellbeingCheckinForDate(patientId, evidence.date);
-        const appointments = db.getAppointments(patientId).filter(a => a.appointment_date === evidence.date && a.status === 'scheduled');
+        const appointments = visitSchedule(db.getAppointments(patientId), evidence.timeZone, now).filter(a => a.appointment_date === evidence.date && a.is_upcoming);
         const completedItems = evidence.taken + Number(Boolean(checkin));
         const routineItems = evidence.due + 1;
         const score = evidence.recorded > 0 || checkin ? Math.round(completedItems / routineItems * 100) : null;

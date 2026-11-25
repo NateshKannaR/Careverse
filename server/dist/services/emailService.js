@@ -16,7 +16,9 @@ export class EmailService {
         const scheduledFor = new Date().toISOString();
         // Check notification preferences
         const prefs = db.getNotificationPreferences(opts.recipientId);
-        if (prefs && !prefs.email_enabled && opts.type !== 'emergency_sos') {
+        if (prefs && opts.type !== 'emergency_sos' && (!prefs.email_enabled ||
+            (opts.type === 'appointment_reminder' && !prefs.appointment_reminders_enabled) ||
+            (opts.type === 'family_digest' && !prefs.daily_digest_enabled))) {
             console.log(`[EmailService] User ${opts.recipientId} has disabled email notifications.`);
             return {
                 success: false,
