@@ -4,7 +4,15 @@ Careverse helps older adults, families, and caregivers coordinate medication sch
 
 [Open the live demo](https://careversebynk.vercel.app/) · [Try the walkthrough](#demo-walkthrough) · [Run locally](#run-locally) · [Review the evidence](#verification)
 
-![Patient dashboard with a daily care plan, the next dose, wellbeing check-in, next visit, and care resources](docs/screenshots/daily-care-plan.jpg)
+```mermaid
+flowchart TD
+    Plan["Open today's care plan"] --> Dose["Record a dose outcome"]
+    Plan --> Mood["Save a wellbeing check-in"]
+    Plan --> Refill["Share a refill note"]
+    Dose --> Routine["Daily routine progress"]
+    Mood --> Routine
+    Refill --> Handoff["Family and caregiver see the same note"]
+```
 
 ## Demo walkthrough
 
@@ -12,8 +20,6 @@ Careverse helps older adults, families, and caregivers coordinate medication sch
 2. Under **Care resources**, open **Medication supply** and choose **Share refill note**. Open **Menu → Caregiver** to find that prescription in **Shared care notes**. A second attempt on the same day reuses the existing note.
 3. Open **Appointments** to schedule a visit, check off a preparation task and export the visit to a calendar. Past visits remain in **Visit history** with their recorded status.
 4. Open **Analytics & Reports**, select a period and inspect a day. **Download dose log** exports the patient’s history. Family members can review the same activity in their digest.
-
-![Adherence report for the fictional demo patient](docs/screenshots/adherence-report.jpg)
 
 The menu includes larger text, high contrast, and English, Tamil, and Hindi interface options. The patient, family, caregiver, and admin views adapt to phone and desktop widths.
 
@@ -25,10 +31,22 @@ The menu includes larger text, high contrast, and English, Tamil, and Hindi inte
 | Adherence reports | Compare 7-, 14-, and 30-day periods, inspect individual days, and see recurring gaps by time slot. |
 | Wellbeing and appointments | Log a daily check-in, review a visit checklist, and export appointment reminders to a calendar. |
 | Care Circle | Invite family or caregivers with expiring passcodes, approve requests, and set permissions. |
-| CareBuddy | Summarize recorded routines and prepare appointment questions using the patient’s stored records. Dosing questions are directed to the prescriber or pharmacist. |
+| CareBuddy | Summarize recorded routines and prepare appointment questions using the patient’s stored records. Ask “What pills do I have left today?” to see unrecorded and upcoming doses in local time. Missed-dose advice questions direct the user to a prescriber or pharmacist. |
 | Demo operations | Four role-based accounts, a simulated inbox, and an SOS confirmation flow. Use fictional information in the public deployment. |
 
 ## How the numbers are calculated
+
+```mermaid
+flowchart TD
+    Schedule["Dose on the patient's schedule"] --> Due{"Has the scheduled time arrived?"}
+    Due -->|No| Upcoming["Upcoming"]
+    Due -->|Yes| Known{"Is an outcome recorded?"}
+    Known -->|No| Pending["Awaiting a record"]
+    Known -->|Yes| Recorded["Taken, missed or skipped"]
+    Recorded --> Adherence["Recorded adherence = taken / recorded outcomes"]
+    Recorded --> Coverage["Outcome coverage = recorded outcomes / due doses"]
+    Pending --> Coverage
+```
 
 Careverse groups dose records by the patient’s local calendar day. The report includes a dose once its scheduled time has passed. Future doses remain visible in the daily schedule.
 
@@ -47,9 +65,10 @@ The checks below run on fixed synthetic records. They measure the outputs descri
 | --- | ---: | ---: |
 | [Adherence scenarios](server/tests/unit/adherenceAccuracy.test.ts) | 4 of 15 at `52bff56` | 15 of 15 |
 | [Care-plan workflow scenarios](server/tests/integration/carePlanWorkflows.test.ts) | 0 of 11 at `a705b85` | 11 of 11 |
+| [CareBuddy schedule questions](server/tests/unit/careBuddySchedule.test.ts) | 0 of 7 at `8466c5f` | 7 of 7 |
 | [Daily care evidence scenarios](server/tests/unit/careEvidenceAccuracy.test.ts) | 1 of 11 at `23af8e0` | 11 of 11 |
 
-The regression suite passes 117 automated tests across the server and client. The care-plan scenarios exercise a newly added prescription, pause and resume, as-needed medication, retained dose history, refill handoffs, visit classification, daylight-saving transitions and simulated SOS delivery. The [time-zone tests](server/tests/unit/patientSchedule.test.ts) also cover India and Nepal, leap day and the change between summer and winter offsets.
+The regression suite passes 124 automated tests across the server and client. The care-plan scenarios exercise a newly added prescription, pause and resume, as-needed medication, retained dose history, refill handoffs, visit classification, daylight-saving transitions and simulated SOS delivery. The [time-zone tests](server/tests/unit/patientSchedule.test.ts) also cover India and Nepal, leap day and the change between summer and winter offsets.
 
 Browser checks covered patient check-in edits, a refill note read by family and caregiver, a caregiver handoff, visit creation and cancellation, the checklist, calendar export, and all four demo dashboards. Nine routes were checked at six widths from 320 to 1440 px for horizontal overflow.
 

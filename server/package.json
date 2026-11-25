@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc && esbuild src/server.ts --bundle --platform=node --format=esm --banner:js=\"import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);\" --outfile=dist/server.js && cp dist/server.js index.js && cp dist/server.js server.js",
+    "build": "tsc && esbuild src/server.ts --bundle --platform=node --format=esm --banner:js=\"import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);\" --outfile=dist/server.js",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest"

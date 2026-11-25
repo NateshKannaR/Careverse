@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { verifyPatientAccess } from '../middleware/rbacMiddleware.js';
 import { authenticateJwt } from '../middleware/authMiddleware.js';
 import { CareBuddyService } from '../services/careBuddyService.js';
 import { db } from '../db/storageAdapter.js';
@@ -39,6 +40,8 @@ router.post('/chat', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
+
   const response = await CareBuddyService.askCareBuddy(patientId, parsed.data.message);
 
   db.logAudit({
@@ -60,6 +63,8 @@ router.get('/summary', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
+
   const response = await CareBuddyService.askCareBuddy(patientId, 'Summarize today routine and progress');
   res.json(response);
 });
@@ -71,6 +76,8 @@ router.get('/digest', (req: Request, res: Response): void => {
     res.status(400).json({ error: 'Patient ID is required.' });
     return;
   }
+
+  if (!verifyPatientAccess(req, res, patientId, 'view')) return;
 
   const digest = CareBuddyService.generateFamilyDigest(patientId);
   res.json({ digest });

@@ -1,3 +1,4 @@
+import { getDailyDoseEvidence } from './adherencePatternService.js';
 import { visitSchedule } from './patientSchedule.js';
 import { db } from '../db/storageAdapter.js';
 import { CareScoreService, type DailyCareScoreBreakdown } from './careScoreService.js';
@@ -33,6 +34,26 @@ function upcomingAppointments(patientId: string, score: DailyCareScoreBreakdown,
   return visitSchedule(db.getAppointments(patientId), score.timeZone, now).filter(visit => visit.is_upcoming);
 }
 
+function remainingSchedule(patientId: string, now: Date, timeZone: string): string {
+  const day = getDailyDoseEvidence(db.getAdministrationRecords(patientId), now, timeZone);
+  if (!day.records.length) return `No doses are scheduled for ${day.date} (${timeZone}).`;
+
+  const remaining = day.records
+    .filter(record => ['upcoming', 'due_now', 'acknowledged'].includes(record.status))
+    .sort((a, b) => Date.parse(a.scheduled_time) - Date.parse(b.scheduled_time));
+  if (!remaining.length) return `All scheduled doses have a recorded outcome for ${day.date} (${timeZone}).`;
+
+  const clock = new Intl.DateTimeFormat('en-GB', {
+    timeZone, hour: '2-digit', minute: '2-digit', timeZoneName: 'short', hourCycle: 'h23',
+  });
+  const lines = remaining.map(record => {
+    const scheduled = new Date(record.scheduled_time);
+    const state = scheduled.getTime() <= now.getTime() ? 'awaiting a record' : 'upcoming';
+    return `• ${record.medication?.name ?? 'Prescription'} · ${clock.format(scheduled)} · ${state}`;
+  });
+  return [`Schedule for ${day.date} (${timeZone})`, ...lines].join('\n');
+}
+
 export class CareBuddyService {
   /**
    * Generates intelligent, contextual response using the patient's authenticated medical records.
@@ -58,13 +79,25 @@ export class CareBuddyService {
 
     const query = userMessage.toLowerCase().trim();
 
-    if (/\b(?:double|forgot|make up)\b|\b(?:can|could|should)\s+i\b[^?]*\b(?:take|skip|repeat)\b|\bi\s+missed\b/.test(query)) {
+    if (/\b(?:double|forgot|make up)\b|\b(?:can|could|should)\s+i\b[^?]*\b(?:take|skip|repeat)\b|\bi\s+missed\b|\bif\s+i\s+miss\s+(?:a|my|the)\s+dose\b/.test(query)) {
       return {
         reply: 'Contact your prescribing clinic or local pharmacist for instructions specific to the medication. They can tell you whether a late dose is appropriate. Share the medication name, scheduled time, and what you have already taken.',
         suggestedFollowUps: ['Show my medication schedule', 'Summarize my day'],
         contextUsed,
         disclaimer: MEDICAL_DISCLAIMER,
         source: 'contextual-assistant'
+      };
+    }
+
+    const asksWhichDosesRemain = /\b(?:pills?|doses?|medications?|medicines?)\b/.test(query)
+      && /\b(?:left today|left for today|remain(?:ing)? today|still due|due today|upcoming doses?)\b/.test(query);
+    if (asksWhichDosesRemain) {
+      return {
+        reply: remainingSchedule(patientId, now, careScore.timeZone),
+        suggestedFollowUps: ['Summarize my day', 'Show my medication schedule'],
+        contextUsed,
+        disclaimer: MEDICAL_DISCLAIMER,
+        source: 'contextual-assistant',
       };
     }
 

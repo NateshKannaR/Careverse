@@ -104,9 +104,9 @@ export const LandingPage: React.FC = () => {
               </li>)}
             </ul>
           </div>
-          <img src={new URL('../../../docs/screenshots/daily-care-plan.jpg', import.meta.url).href}
+          <img src={new URL('../assets/daily-care-plan.webp', import.meta.url).href}
             alt="Eleanor’s fictional care plan with dose schedule, wellbeing check-in, next visit and care resources"
-            width="1440" height="920" loading="lazy" className="w-full rounded-2xl border border-slate-200 shadow-card" />
+            width="1080" height="690" loading="lazy" className="w-full rounded-2xl border border-slate-200 shadow-card" />
         </div>
       </section>
 
